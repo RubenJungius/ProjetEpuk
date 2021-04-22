@@ -14,35 +14,6 @@ from threading import Thread
 # pip install pyinstaller (need to be used with Python3)
 # cf. https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html
 
-goodbye = """
-          |\      _,,,---,,_
-          /,`.-'`'    -.  ;-;;,_
-         |,4-  ) )-,_..;\ (  `'-'
- _______'---''(_/--'__`-'\_)______   ______            _______  _
-(  ____ \(  ___  )(  ___  )(  __  \ (  ___ \ |\     /|(  ____ \| |
-| (    \/| (   ) || (   ) || (  \  )| (   ) )( \   / )| (    \/| |
-| |      | |   | || |   | || |   ) || (__/ /  \ (_) / | (__    | |
-| | ____ | |   | || |   | || |   | ||  __ (    \   /  |  __)   | |
-| | \_  )| |   | || |   | || |   ) || (  \ \    ) (   | (      |_|
-| (___) || (___) || (___) || (__/  )| )___) )   | |   | (____/\ _ 
-(_______)(_______)(_______)(______/ |______/    \_/   (_______/(_)                                         
-"""
-
-goodbye2 = """
-                   /\_/\\
-                 =( °w° )=
-                   )   (  //
-                  (__ __)//
- _____                 _ _                _ 
-|  __ \               | | |              | |
-| |  \/ ___   ___   __| | |__  _   _  ___| |
-| | __ / _ \ / _ \ / _` | '_ \| | | |/ _ \ |
-| |_\ \ (_) | (_) | (_| | |_) | |_| |  __/_|
- \____/\___/ \___/ \__,_|_.__/ \__, |\___(_)
-                                __/ |       
-                               |___/        
-"""
-
 #number of samples for one line from the camera
 n = 640
 #maximum value for an uint8
@@ -52,8 +23,8 @@ max_value = 255
 def handle_close(evt):
     #we stop the serial thread
     reader_thd.stop()
-    print(goodbye)
-    
+    print("goodbye")
+
 #update the plots
 def update_plot():
     if(reader_thd.need_to_update_plot()):
@@ -64,10 +35,10 @@ def update_plot():
 def update_cam_plot(port):
 
     cam_data = readUint8Serial(port)
-    
+
     if(len(cam_data)>0):
         cam_plot.set_ydata(cam_data)
-        
+
         graph_cam.relim()
         graph_cam.autoscale()
 
@@ -124,9 +95,9 @@ def readUint8Serial(port):
 
     #reads the size
     #converts as short int in little endian the two bytes read
-    size = struct.unpack('<h',port.read(2)) 
+    size = struct.unpack('<h',port.read(2))
     #removes the second element which is void
-    size = size[0]  
+    size = size[0]
 
     #reads the data
     rcv_buffer = port.read(size)
@@ -164,18 +135,19 @@ class serial_thread(Thread):
             sys.exit(0)
     #function called after the init
     def run(self):
-        
+
         while(self.alive):
 
             if(self.contReceive):
-                update_cam_plot(self.port)
+                print(readUint8Serial(self.port))
+                # update_cam_plot(self.port)
             else:
                 #flush the serial
                 self.port.read(self.port.inWaiting())
                 time.sleep(0.1)
 
     #enables the continuous reading
-    def setContReceive(self, val):  
+    def setContReceive(self, val):
         self.contReceive = True
 
     #disables the continuous reading
@@ -204,7 +176,7 @@ class serial_thread(Thread):
                 time.sleep(0.01)
             self.port.close()
 
-        
+
 #test if the serial port as been given as argument in the terminal
 if len(sys.argv) == 1:
     print('Please give the serial port to use as argument')
