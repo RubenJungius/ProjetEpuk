@@ -54,3 +54,4 @@ dkms.conf
 # Buildfolder
 project/src/pathfinder/build/
 project/lib/
+project/src/pathfinder/.settings/language.settings.xml
