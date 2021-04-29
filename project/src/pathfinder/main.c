@@ -68,17 +68,22 @@ int main(void)
     	}
        	SendUint8ToComputer(tmp, 8);
         //chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-        for(int i = 0; i < 8; i++){
+       	//left_motor_set_speed(500);
+       	//right_motor_set_speed(500);
+
+       	for(int i = 0; i < 8; i++){
         	if(tmp[i]>100){
-        		set_body_led(2);
-        		light = 1;
+        		//set_body_led(2);
+        		//light = 1;
+        		left_motor_set_speed(0);
+        		right_motor_set_speed(0);
         		break;
         	}
         }
-        if(light){
+        /*if(light){
         	set_body_led(1);
         	light = 0;
-        }
+        }*/
         chThdSleepMilliseconds(100);
     }
 }
