@@ -126,6 +126,7 @@ void chSysInit(void) {
 #if CH_DBG_ENABLE_STACK_CHECK == TRUE
   /* This is a special case because the main thread thread_t structure is not
      adjacent to its stack area.*/
+
   currp->p_stklimit = &__main_thread_stack_base__;
 #endif
   chSysEnable();

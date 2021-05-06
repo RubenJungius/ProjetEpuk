@@ -11,12 +11,16 @@
 #include <motors.h>
 #include <chprintf.h>
 #include <leds.h>
+#include "calibration.h"
+#include "regulator.h"
+
 
 #include "sensors/proximity.h"
 
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
 CONDVAR_DECL(bus_condvar);
+
 
 static void serial_start(void)
 {
@@ -37,6 +41,7 @@ void SendUint8ToComputer(uint8_t* data, uint16_t size)
 	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)data, size);
 }
 
+
 int main(void)
 {
     halInit();
@@ -50,8 +55,17 @@ int main(void)
     //inits the motors
 	motors_init();
 
-	uint8_t tmp[8];
-	int light = 0;
+
+	uint16_t tmp[8];
+
+	// Tab of correspondence threw raw proximity values and correspondent distance values
+	uint16_t conversionTab[MEASUREMENT_NUMBER][2];
+
+
+
+	// constants        !!! faire un define je pense !!!
+	uint8_t period = 50; //milliseconds
+
 
 	proximity_start();
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
@@ -59,32 +73,43 @@ int main(void)
 
 	calibrate_ir();
 
+	/*Calibration of the proximity captors*/
+	calibration(conversionTab);
+	/* Return to the initial position */
+	positioning(conversionTab, 40);
+	chThdSleepMilliseconds(1000);
+	positioning(conversionTab, 10);
+	chThdSleepMilliseconds(1000);
+	positioning(conversionTab, conversionTab[MEASUREMENT_NUMBER - 1][0]);
+	// past measurements
+	uint16_t lastLatSpeed = 0; // pas sur
+	//uint16_t* p_lastLatSpeed = &lastLatSpeed;
+	uint16_t integral = 0;
+	//uint16_t* p_integral = &integral;
+	uint16_t pOld = get_distance(conversionTab, get_prox(2));
+	//uint16_t* p_pOld = &pOld; //
+
+
    	/* Infinite loop. */
     while (1) {
-    	//waits 1 second
+    	/*
     	for(int i = 0; i < 8; i++){
-        	tmp[i]=get_prox(i);
-        	//chprintf((BaseSequentialStream *)&SD3, "%d: %d; ",i, tmp[i]);
+        	tmp[i] = get_distance(conversionTab, get_prox(i));
     	}
-       	SendUint8ToComputer(tmp, 8);
-        //chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-       	//left_motor_set_speed(500);
-       	//right_motor_set_speed(500);
 
-       	for(int i = 0; i < 8; i++){
-        	if(tmp[i]>100){
-        		//set_body_led(2);
-        		//light = 1;
-        		left_motor_set_speed(0);
-        		right_motor_set_speed(0);
-        		break;
-        	}
-        }
-        /*if(light){
-        	set_body_led(1);
-        	light = 0;
-        }*/
-        chThdSleepMilliseconds(100);
+    	chprintf((BaseSequentialStream *)&SD3, " FRONT : %d ; ", tmp[0] == 0 ? 0 : tmp[0]);
+    	chprintf((BaseSequentialStream *)&SD3, " RIGHT : %d ; ", tmp[2] == 0 ? 0 : tmp[2]);
+    	chprintf((BaseSequentialStream *)&SD3, " LEFT : %d ; ", tmp[5] == 0 ? 0 : tmp[5]);
+
+    	//SendUint8ToComputer(tmp, 8);
+        chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+        */
+
+
+        // implementation of the maze algorithm
+        regulation(period, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
+
+        chThdSleepMilliseconds(period);
     }
 }
 
