@@ -15,6 +15,8 @@
 #include <leds.h>
 #include <motors.h>
 
+// Tab of correspondence threw raw proximity values and correspondent distance values
+uint16_t conversionTab[MEASUREMENT_NUMBER][2];
 
 uint16_t get_distance(uint16_t conversionTab[][2], uint16_t rawValue) {
 	for(int i = 0; i < MEASUREMENT_NUMBER - 1; i++) {
@@ -124,4 +126,23 @@ void regulation(uint8_t period, uint8_t captorNumber, uint16_t* p_pOld, uint16_t
 }
 
 
+static THD_WORKING_AREA(regulation_thd_wa, 256); ///256????
+static THD_FUNCTION(regulation_thd, arg){
+	(void) arg;
+	chRegSetThreadName(__FUNCTION__);
 
+	// past measurements
+	uint16_t lastLatSpeed = 0; // pas sur
+	uint16_t integral = 0;
+	uint16_t pOld = get_distance(conversionTab, get_prox(2));
+
+	while(1){
+		regulation(PERIOD_REGULATOR, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
+
+		chThdSleepMilliseconds(PERIOD_REGULATOR);
+	}
+}
+
+void regulation_start(){
+	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
+}

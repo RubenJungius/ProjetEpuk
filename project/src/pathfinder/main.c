@@ -11,7 +11,7 @@
 #include <motors.h>
 #include <chprintf.h>
 #include <leds.h>
-#include "calibration.h"
+//#include "calibration.h"
 #include "regulator.h"
 
 
@@ -62,11 +62,6 @@ int main(void)
 	uint16_t conversionTab[MEASUREMENT_NUMBER][2];
 
 
-
-	// constants        !!! faire un define je pense !!!
-	uint8_t period = 50; //milliseconds
-
-
 	proximity_start();
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
 	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
@@ -75,19 +70,10 @@ int main(void)
 
 	/*Calibration of the proximity captors*/
 	calibration(conversionTab);
+
+	//launch thread
+	regulation_start();
 	/* Return to the initial position */
-	positioning(conversionTab, 40);
-	chThdSleepMilliseconds(1000);
-	positioning(conversionTab, 10);
-	chThdSleepMilliseconds(1000);
-	positioning(conversionTab, conversionTab[MEASUREMENT_NUMBER - 1][0]);
-	// past measurements
-	uint16_t lastLatSpeed = 0; // pas sur
-	//uint16_t* p_lastLatSpeed = &lastLatSpeed;
-	uint16_t integral = 0;
-	//uint16_t* p_integral = &integral;
-	uint16_t pOld = get_distance(conversionTab, get_prox(2));
-	//uint16_t* p_pOld = &pOld; //
 
 
    	/* Infinite loop. */
@@ -107,9 +93,9 @@ int main(void)
 
 
         // implementation of the maze algorithm
-        regulation(period, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
+    //    regulation(period, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
 
-        chThdSleepMilliseconds(period);
+        chThdSleepMilliseconds(50);
     }
 }
 
