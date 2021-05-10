@@ -11,7 +11,7 @@
 #include <motors.h>
 #include <chprintf.h>
 #include <leds.h>
-//#include "calibration.h"
+#include "calibration.h"
 #include "regulator.h"
 
 
@@ -56,10 +56,7 @@ int main(void)
 	motors_init();
 
 
-	uint16_t tmp[8];
-
-	// Tab of correspondence threw raw proximity values and correspondent distance values
-	uint16_t conversionTab[MEASUREMENT_NUMBER][2];
+	//uint16_t tmp[8];
 
 
 	proximity_start();
@@ -68,8 +65,10 @@ int main(void)
 
 	calibrate_ir();
 
-	/*Calibration of the proximity captors*/
-	calibration(conversionTab);
+	/* Calibration of the proximity captors */
+	calibration();
+
+	positioning(50); // !! magic number
 
 	//launch thread
 	regulation_start();
@@ -78,10 +77,12 @@ int main(void)
 
    	/* Infinite loop. */
     while (1) {
-    	/*
+/*
     	for(int i = 0; i < 8; i++){
         	tmp[i] = get_distance(conversionTab, get_prox(i));
     	}
+
+
 
     	chprintf((BaseSequentialStream *)&SD3, " FRONT : %d ; ", tmp[0] == 0 ? 0 : tmp[0]);
     	chprintf((BaseSequentialStream *)&SD3, " RIGHT : %d ; ", tmp[2] == 0 ? 0 : tmp[2]);
@@ -89,8 +90,7 @@ int main(void)
 
     	//SendUint8ToComputer(tmp, 8);
         chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-        */
-
+*/
 
         // implementation of the maze algorithm
     //    regulation(period, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
