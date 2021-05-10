@@ -14,7 +14,8 @@
 #include "calibration.h"
 #include "regulator.h"
 
-
+#include <audio/microphone.h>
+#include <process_mic.h>
 #include "sensors/proximity.h"
 
 messagebus_t bus;
@@ -32,13 +33,6 @@ static void serial_start(void)
 	};
 
 	sdStart(&SD3, &ser_cfg); // UART3.
-}
-
-void SendUint8ToComputer(uint8_t* data, uint16_t size)
-{
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)"START", 5);
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)&size, sizeof(uint16_t));
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)data, size);
 }
 
 
@@ -69,6 +63,8 @@ int main(void)
 	calibration();
 
 	positioning(50); // !! magic number
+	//launchAudioThread
+	mic_start(&processAudioData);
 
 	//launch thread
 	regulation_start();
