@@ -13,6 +13,7 @@
 #include <leds.h>
 #include "calibration.h"
 #include "regulator.h"
+#include "communications.h"
 
 #include <audio/microphone.h>
 #include <process_mic.h>
@@ -21,20 +22,6 @@
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
 CONDVAR_DECL(bus_condvar);
-
-
-static void serial_start(void)
-{
-	static SerialConfig ser_cfg = {
-	    115200,
-	    0,
-	    0,
-	    0,
-	};
-
-	sdStart(&SD3, &ser_cfg); // UART3.
-}
-
 
 int main(void)
 {
@@ -57,23 +44,29 @@ int main(void)
 
 	calibrate_ir();
 
+#ifdef AUDIO
+	//launchAudioThread
+	init_counter();
+	mic_start(&processAudioData);
+#endif
+
+#ifdef DRIVE
 	/* Calibration of the proximity captors */
 	calibration();
 
 	/* Return to the initial position */
 	dist_positioning(MEASUREMENT_NUMBER );
-
 	angle_positioning((float)M_PI / (float)2);
 
-	chThdSleepSeconds(2);
-
-	//launch threads
+	//launch thread
 	measurements_start();
 	regulation_start();
 
+#endif
 
+	chThdSleepSeconds(2);
 
-   	/* Infinite loop. */
+	/* Infinite loop. */
     while (1) {
         chThdSleepMilliseconds(1000);
     }

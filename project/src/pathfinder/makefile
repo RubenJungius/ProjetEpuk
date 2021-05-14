@@ -12,6 +12,10 @@ CSRC += ./main.c \
 		./calibration.c \
 		./regulator.c \
 		./measurements.c \
+		./communications.c \
+		./process_mic.c \
+		./fft.c \
+
 #		./pi_regulator.c \
 #		./process_image.c \
 		

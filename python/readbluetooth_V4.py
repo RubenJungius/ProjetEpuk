@@ -8,7 +8,8 @@ from threading import Thread
 n = 640
 # maximum value for an uint8
 max_value = 255
-
+# time measurement stuff interval thingy
+interval = 0.001
 
 # handler when closing the window
 def handle_close(evt):
@@ -105,6 +106,8 @@ class serial_thread(Thread):
         self.contReceive = True
         self.alive = True
         self.need_to_update = False
+        i = 0
+        data = []
 
         print('Connecting to port {}'.format(port))
 
@@ -118,7 +121,9 @@ class serial_thread(Thread):
     def run(self):
         while(self.alive):
             if(self.contReceive):
-                processData(readUint8Serial(self.port))
+                data[i] = readUint8Serial(self.port)
+                i++
+                processData(data)
                 # update_cam_plot(self.port)
             else:
                 # flush the serial
