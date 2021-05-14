@@ -4,8 +4,10 @@
 #include <math.h>
 #include "ch.h"
 
+#include "collision_detect.h"
 #include "calibration.h"
 #include <leds.h>
+#include <motors.h>
 
 #include "sensors/proximity.h"
 
@@ -15,11 +17,13 @@ static THD_FUNCTION(collision_thd, arg){
 	chRegSetThreadName(__FUNCTION__);
 
 	while(1){
-		if(get_distance(get_prox(7))<MIN_COL_DISTANCE)
+		if(get_distance(get_prox(7)) < MIN_COL_DISTANCE){
 			set_body_led(1);
-		else
+			left_motor_set_speed(0);
+			right_motor_set_speed(0);
+		}else
 			set_body_led(0);
-		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+		chThdSleepMilliseconds(10);
 	}
 }
 
