@@ -18,6 +18,9 @@ static float micFront_cmplx_input[2 * FFT_SIZE];
 static float micFront_output[FFT_SIZE];
 static int sequence_counter;
 static int sequence_timer;
+static messagebus_topic_t microphone_topic;
+static microphone_msg_t mic_accepted;
+
 
 #define MIN_VALUE_THRESHOLD	10000
 
@@ -30,6 +33,7 @@ static int sequence_timer;
 #define INTERVAL		1
 #define SEQUENCE_TIME 	2000
 #define MAX_FREQ		53//260	//we don't analyze after this index to not use resources for nothing
+
 void sound_remote(float* data){
 	float max_norm = MIN_VALUE_THRESHOLD;
 	int16_t max_norm_index = -1;
@@ -41,7 +45,7 @@ void sound_remote(float* data){
 			max_norm_index = i;
 		}
 	}
-
+	mic_accepted.microphone_value = 0;
 	//launch sequence
 	if(sequence_counter == 0){
 		if(max_norm_index >= FREQ_1 - INTERVAL && max_norm_index <= FREQ_1 + INTERVAL){
@@ -59,38 +63,43 @@ void sound_remote(float* data){
 		sequence_counter = 0;
 
 	if(sequence_counter == 3){ //sequence accepted
-		set_body_led(1);
-		chThdSleepMilliseconds(1000);
 		sequence_counter = 0;
-		set_body_led(0);
+		mic_accepted.microphone_value = 1;
 	}
 
-	chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
+	messagebus_topic_publish(&microphone_topic, &mic_accepted, sizeof(mic_accepted));
+	//chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 }
 
 void init_counter(){
 	sequence_counter = 0;
 	sequence_timer = chVTGetSystemTime();
 }
+void init_messagebus(){
+	MUTEX_DECL(mic_topic_lock);
+	CONDVAR_DECL(mic_topic_condvar);
+	messagebus_topic_init(&microphone_topic, &mic_topic_lock, &mic_topic_condvar, &mic_accepted, sizeof(mic_accepted));
+	messagebus_advertise_topic(&bus, &microphone_topic, "/microphone");
+}
 
 /*
-*	Callback called when the demodulation of the four microphones is done.
-*	We get 160 samples per mic every 10ms (16kHz)
-*
-*	params :
-*	int16_t *data			Buffer containing 4 times 160 samples. the samples are sorted by micro
-*							so we have [micRight1, micLeft1, micBack1, micFront1, micRight2, etc...]
-*	uint16_t num_samples	Tells how many data we get in total (should always be 640)
-*/
+ *	Callback called when the demodulation of the four microphones is done.
+ *	We get 160 samples per mic every 10ms (16kHz)
+ *
+ *	params :
+ *	int16_t *data			Buffer containing 4 times 160 samples. the samples are sorted by micro
+ *							so we have [micRight1, micLeft1, micBack1, micFront1, micRight2, etc...]
+ *	uint16_t num_samples	Tells how many data we get in total (should always be 640)
+ */
 void processAudioData(int16_t *data, uint16_t num_samples){
 
 	/*
-	*
-	*	We get 160 samples per mic every 10ms
-	*	So we fill the samples buffers to reach
-	*	1024 samples, then we compute the FFTs.
-	*
-	*/
+	 *
+	 *	We get 160 samples per mic every 10ms
+	 *	So we fill the samples buffers to reach
+	 *	1024 samples, then we compute the FFTs.
+	 *
+	 */
 
 	static uint16_t nb_samples = 0;
 
@@ -113,20 +122,20 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 
 	if(nb_samples >= (2 * FFT_SIZE)){
 		/*	FFT proccessing
-		*
-		*	This FFT function stores the results in the input buffer given.
-		*	This is an "In Place" function.
-		*/
+		 *
+		 *	This FFT function stores the results in the input buffer given.
+		 *	This is an "In Place" function.
+		 */
 
 		doFFT_optimized(FFT_SIZE, micFront_cmplx_input);
 
 		/*	Magnitude processing
-		*
-		*	Computes the magnitude of the complex numbers and
-		*	stores them in a buffer of FFT_SIZE because it only contains
-		*	real numbers.
-		*
-		*/
+		 *
+		 *	Computes the magnitude of the complex numbers and
+		 *	stores them in a buffer of FFT_SIZE because it only contains
+		 *	real numbers.
+		 *
+		 */
 		arm_cmplx_mag_f32(micFront_cmplx_input, micFront_output, FFT_SIZE);
 
 		nb_samples = 0;

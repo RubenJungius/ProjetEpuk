@@ -17,7 +17,12 @@ typedef enum {
 	BACK_OUTPUT
 } BUFFER_NAME_t;
 
+typedef struct{
+	int microphone_value;
+}microphone_msg_t;
+
 void init_counter(void);
 void processAudioData(int16_t *data, uint16_t num_samples);
+void init_messagebus(void);
 
 #endif /* PROCESS_MIC_H_ */

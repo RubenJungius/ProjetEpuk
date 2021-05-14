@@ -10,6 +10,7 @@ extern "C" {
 #include "parameter/parameter.h"
 
 //#define AUDIO
+//#define AUDIO_MESSAGE
 #define DRIVE
 #define COLLISION
 
@@ -20,8 +21,6 @@ extern "C" {
 extern messagebus_t bus;
 
 extern parameter_namespace_t parameter_root;
-
-void SendUint8ToComputer(uint8_t* data, uint16_t size);
 
 #ifdef __cplusplus
 }

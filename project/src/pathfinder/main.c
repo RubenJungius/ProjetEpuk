@@ -21,6 +21,8 @@
 #include "sensors/proximity.h"
 
 messagebus_t bus;
+microphone_msg_t microphone_value;
+proximity_msg_t prox_values;
 MUTEX_DECL(bus_lock);
 CONDVAR_DECL(bus_condvar);
 
@@ -31,7 +33,7 @@ int main(void)
     mpu_init();
 
     //starts the serial communication
-    //serial_start();
+    serial_start();
     //start the USB communication
     usb_start();
     //inits the motors
@@ -40,15 +42,17 @@ int main(void)
 
 	proximity_start();
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
-//	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
-	messagebus_find_topic_blocking(&bus, "/proximity");
+	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
+//	messagebus_find_topic_blocking(&bus, "/proximity");
 
 	calibrate_ir();
 
 #ifdef AUDIO
 	//launchAudioThread
 	init_counter();
+	init_messagebus();
 	mic_start(&processAudioData);
+	messagebus_topic_t *microphone_topic = messagebus_find_topic_blocking(&bus, "/microphone");
 #endif
 
 
@@ -63,18 +67,28 @@ int main(void)
 	//launch thread
 	measurements_start();
 	regulation_start();
-
-#endif
-
 #ifdef COLLISION
 	collision_detect_start();
 #endif
+
+#endif
+
 
 	chThdSleepSeconds(2);
 
 	/* Infinite loop. */
     while (1) {
-        chThdSleepMilliseconds(1000);
+    	messagebus_topic_read(proximity_topic, &prox_values, sizeof(prox_values));
+    	chprintf((BaseSequentialStream*)&SD3, "%d, %d\r\n",prox_values.ambient[0], prox_values.ambient[7]);
+#ifdef AUDIO_MESSAGE
+    	messagebus_topic_read(microphone_topic, &microphone_value, sizeof(microphone_value));
+    	if(microphone_value.microphone_value){
+    		set_body_led(1);
+    		chThdSleepSeconds(1);
+    		set_body_led(0);
+    	}
+#endif
+    	chThdSleepMilliseconds(100);
     }
 }
 
