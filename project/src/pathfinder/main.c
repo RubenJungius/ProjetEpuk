@@ -49,53 +49,39 @@ int main(void)
     mpu_init();
 
     //starts the serial communication
-    serial_start();
+    //serial_start();
     //start the USB communication
     usb_start();
     //inits the motors
 	motors_init();
 
 
-	//uint16_t tmp[8];
-
-
 	proximity_start();
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
-	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
+//	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
+	messagebus_find_topic_blocking(&bus, "/proximity");
 
 	calibrate_ir();
 
 	/* Calibration of the proximity captors */
 	calibration();
 
-	positioning(50); // !! magic number
-
-	//launch thread
-	regulation_start();
 	/* Return to the initial position */
+	dist_positioning(MEASUREMENT_NUMBER );
+
+	angle_positioning((float)M_PI / (float)2);
+
+	chThdSleepSeconds(2);
+
+	//launch threads
+	measurements_start();
+	regulation_start();
+
 
 
    	/* Infinite loop. */
     while (1) {
-/*
-    	for(int i = 0; i < 8; i++){
-        	tmp[i] = get_distance(conversionTab, get_prox(i));
-    	}
-
-
-
-    	chprintf((BaseSequentialStream *)&SD3, " FRONT : %d ; ", tmp[0] == 0 ? 0 : tmp[0]);
-    	chprintf((BaseSequentialStream *)&SD3, " RIGHT : %d ; ", tmp[2] == 0 ? 0 : tmp[2]);
-    	chprintf((BaseSequentialStream *)&SD3, " LEFT : %d ; ", tmp[5] == 0 ? 0 : tmp[5]);
-
-    	//SendUint8ToComputer(tmp, 8);
-        chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-*/
-
-        // implementation of the maze algorithm
-    //    regulation(period, 2, &pOld, &lastLatSpeed, &integral, conversionTab);
-
-        chThdSleepMilliseconds(50);
+        chThdSleepMilliseconds(1000);
     }
 }
 

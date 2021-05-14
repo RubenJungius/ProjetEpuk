@@ -31,7 +31,7 @@ void calibration() {
 	set_led(LED1, 1);
 	for(int i = MEASUREMENT_NUMBER - 1; i >= 0 ; i--){
 		// move the robot of 1 mm then put the proximity measurement in the tab
-		left_motor_set_speed(speed_conversion(10)); // 10mm/s
+		left_motor_set_speed(speed_conversion(10)); // 10mm/s (attention magic number)
 		right_motor_set_speed(speed_conversion(10)); // 10mm/s
 		chThdSleepMilliseconds(100);
 		left_motor_set_speed(0);

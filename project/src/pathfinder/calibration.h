@@ -8,11 +8,11 @@
 #ifndef CALIBRATION_H_
 #define CALIBRATION_H_
 
-#define MEASUREMENT_NUMBER 48
+#define MEASUREMENT_NUMBER 58
 
 /* Fill a tab of correspondence between raw values of the proximity captors and real distances.
    This is done by moving the robot with steps of 1mm (starting at 5 cm of a wall) with measurement recorded each step. */
-void calibration();
+void calibration(void);
 
 uint16_t get_distance(uint16_t rawValue);
 
