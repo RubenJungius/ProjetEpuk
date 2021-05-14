@@ -11,6 +11,7 @@ extern "C" {
 
 #define AUDIO
 //#define DRIVE
+#define COLLISION
 
 //constants for the differents parts of the project
 #define IMAGE_BUFFER_SIZE		640

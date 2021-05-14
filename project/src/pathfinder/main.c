@@ -14,6 +14,7 @@
 #include "calibration.h"
 #include "regulator.h"
 #include "communications.h"
+#include "collision_detect.h"
 
 #include <audio/microphone.h>
 #include <process_mic.h>
@@ -50,6 +51,7 @@ int main(void)
 	mic_start(&processAudioData);
 #endif
 
+
 #ifdef DRIVE
 	/* Calibration of the proximity captors */
 	calibration();
@@ -62,6 +64,10 @@ int main(void)
 	measurements_start();
 	regulation_start();
 
+#endif
+
+#ifdef COLLISION
+	collision_detect_start();
 #endif
 
 	chThdSleepSeconds(2);

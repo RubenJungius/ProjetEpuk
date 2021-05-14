@@ -15,6 +15,7 @@ CSRC += ./main.c \
 		./communications.c \
 		./process_mic.c \
 		./fft.c \
+		./collision_detect.c \
 
 #		./pi_regulator.c \
 #		./process_image.c \
