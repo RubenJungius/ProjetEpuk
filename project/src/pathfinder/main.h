@@ -10,7 +10,7 @@ extern "C" {
 #include "parameter/parameter.h"
 
 #define AUDIO
-//#define DRIVE
+#define DRIVE
 #define COLLISION
 
 //constants for the differents parts of the project
