@@ -49,23 +49,21 @@ void calibration() {
 	set_led(LED1, 0);
 }
 
-uint16_t get_distance(uint16_t rawValue) {
+float get_distance(uint16_t rawValue) {
 	for(int i = 0; i < MEASUREMENT_NUMBER - 1; i++) {
 		// Find the closest values in the tab and return the proportional converted result.
 		if((rawValue <= conversionTab[i][1]) && (rawValue > conversionTab[i + 1][1])) {
-			/*uint16_t interval = conversionTab[i][1] - conversionTab[i + 1][1];
+			uint16_t interval = conversionTab[i][1] - conversionTab[i + 1][1];
 			uint16_t a = conversionTab[i][1] - rawValue;
-			return 10 * conversionTab[i][0] + (a % interval);*/
-			return conversionTab[i][0];
+			return conversionTab[i][0] + ((float)a/(float)interval);
 		}
 	}
-	set_led(LED3, 0);
 	// very close to an obstacle
 	if (rawValue > conversionTab[0][1]) {
 		return 0;
 	}
 	// far from an obstacle
-	else return 100; // attention magic number
+	else return MEASUREMENT_NUMBER + 3;
 }
 
 uint16_t speed_conversion(uint8_t speed_mm_s) {

@@ -9,10 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-//#include "pthread.h"
-//#include "unistd.h"
-//#include "chmtx.h"
-//#include "chconf.h"
+
 
 #include "calibration.h"
 #include <leds.h>
@@ -23,11 +20,24 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_MEASUREMENTS 0.5 //sec
-#define PERIOD_MEASUREMENT 0.1 //sec
+#define PERIOD_MEASUREMENTS 0.2 //sec
+#define PERIOD_MEASUREMENT 0.01 //sec
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
 
-int16_t pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
+/*static void serial_start(void)
+{
+	static SerialConfig ser_cfg = {
+			115200,
+			0,
+			0,
+			0,
+	};
+
+	sdStart(&SD3, &ser_cfg); // UART3.
+}*/
+
+
+float pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
 float alpha = 0;
 
 static mutex_t mutex;
@@ -58,6 +68,7 @@ static THD_FUNCTION(measurements_thd, arg){
 }
 
 void measurements_start(){
+	//serial_start();
 	chThdCreateStatic(measurements_thd_wa, sizeof(measurements_thd_wa), NORMALPRIO+2, measurements_thd, NULL);
 }
 
@@ -68,24 +79,29 @@ void measurements(uint8_t captorNumber, float* p_alpha) {
 	for(int8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i >= 0 ; i--) {
 		pastMeasurements[i] = - get_distance(get_prox(captorNumber));
 		chThdSleepMilliseconds(PERIOD_MEASUREMENT * 1000);
+		/*chprintf((BaseSequentialStream *)&SD3, "pos %d : %f", i, pastMeasurements[i]);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 	}
 	find_alpha(p_alpha);
 }
 
 void find_alpha(float* p_alpha) {
-	float angle[RECORDED_MEASUREMENTS_NUMBER - 1];
-	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 0 ; i--) {
-		angle[i] = (float)(asin((pastMeasurements[i] - pastMeasurements[i - 1]))/(float)(MAX_DIST_ONE_CYCLE));
-		*p_alpha += angle[i];
+	float angle[RECORDED_MEASUREMENTS_NUMBER - 2];
+	float angleSum = 0;
+	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 1 ; i--) {
+		angle[i] = asin((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(MAX_DIST_ONE_CYCLE));
+		angleSum += angle[i];
+		/*chprintf((BaseSequentialStream *)&SD3, "angle %d : %f", i, angle[i]);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 	}
-	*p_alpha = *p_alpha / (float)3;
+	*p_alpha = angleSum / (float)2;
 }
 
 float get_alpha() {
 	return alpha;
 }
 
-int16_t* get_dist_data() {
+float* get_dist_data() {
 	return pastMeasurements;
 }
 

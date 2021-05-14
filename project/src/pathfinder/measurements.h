@@ -23,7 +23,7 @@ void find_alpha(float* p_alpha);
 float get_alpha(void);
 
 // Give the tab of the last distances recorded
-int16_t* get_dist_data(void);
+float* get_dist_data(void);
 
 mutex_t* get_mutex(void);
 

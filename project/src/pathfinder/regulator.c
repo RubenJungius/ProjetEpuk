@@ -10,28 +10,27 @@
 #include <string.h>
 #include <math.h>
 #include "ch.h"
-//#include "chmtx.h"
+#include <chprintf.h>
 
 #include "regulator.h"
 #include "calibration.h"
 #include <leds.h>
 #include <motors.h>
-#include <chprintf.h>
 #include "measurements.h"
 
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.5 // sec
+#define PERIOD_REGULATOR	 0.24 // sec
 #define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
 #define MAX_ANGLE_ROT	 (float)(MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm // à changer
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
 #define OFFSET 		10 // mm, distance to the wall we want the robot to stabilize
 
-#define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
+#define KP 		20.0 * (float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
 #define	KI		0
-#define	KD		0.005
+#define	KD		0 //0.01
 
 
 
@@ -93,7 +92,7 @@ static THD_FUNCTION(regulation_thd, arg){
 
 	// initial conditions
 	int16_t integral = 0;
-	//int16_t pOld = - DIST_DETECTION + OFFSET;
+	float pOld = - DIST_DETECTION + OFFSET;
 	//float alphaNew = 0;
 	//uint8_t firstDetection = 1;
 	//left_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
@@ -106,11 +105,10 @@ static THD_FUNCTION(regulation_thd, arg){
 	while(1) {
 		chMtxLock(get_mutex());
 		chCondWait(get_condition());
-		regulation(/*2, &pOld, &alphaNew, &integral, &firstDetection*/);
+		regulation(/*2, */&pOld,/* &alphaNew,*/ &integral/*, &firstDetection*/);
 		chMtxUnlock(get_mutex());
 		//chThdYield();
-		//chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);}
-
+		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
 }
 
@@ -135,12 +133,21 @@ void regulation_start() {
 /****** PID *******/
 
 
-void regulation(/*uint8_t captorNumber, int16_t* p_pOld, float* p_alphaNew, int16_t* p_integral, uint8_t* p_firstDetection*/) {
+void regulation(/*uint8_t captorNumber, */float* p_pOld,/* float* p_alphaNew,*/ int16_t* p_integral/*, uint8_t* p_firstDetection*/) {
 	// Get the current lateral position
 
-	int16_t pNew = ((int16_t*)get_dist_data())[0] + OFFSET;
+	float pNew = ((float*)get_dist_data())[0] + OFFSET;
+	// float pOld = ((float*)get_dist_data())[3] + OFFSET;
 	float alpha = get_alpha();
 
+	chprintf((BaseSequentialStream *)&SD3, "p0 : %f", ((float*)get_dist_data())[0]);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+	chprintf((BaseSequentialStream *)&SD3, "p1 : %f", ((float*)get_dist_data())[1]);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+	chprintf((BaseSequentialStream *)&SD3, "p2 : %f", ((float*)get_dist_data())[2]);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+	chprintf((BaseSequentialStream *)&SD3, "p3 : %f", ((float*)get_dist_data())[3]);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
 
@@ -165,16 +172,16 @@ void regulation(/*uint8_t captorNumber, int16_t* p_pOld, float* p_alphaNew, int1
 		right_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
 	}
 	 */
-	if(pNew >= - DIST_DETECTION /*&& !*p_firstDetection*/){
+	if(pNew >= - DIST_DETECTION + OFFSET /*&& !*p_firstDetection*/){
 		// wall approaching algorithm
 		// Calculates beta, the objective angle
-		float beta = pid(/*p_pOld,*/ pNew/*, p_integral*/);
+		float beta = pid(*p_pOld, pNew, p_integral);
 
 		chprintf((BaseSequentialStream *)&SD3, "beta : %f", beta);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		chprintf((BaseSequentialStream *)&SD3, "alpha : %f", alpha);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-		chprintf((BaseSequentialStream *)&SD3, "pNew : %d", pNew);
+		chprintf((BaseSequentialStream *)&SD3, "pNew : %f", pNew);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		// Calculates the angle we want the robot to rotate
@@ -192,8 +199,9 @@ void regulation(/*uint8_t captorNumber, int16_t* p_pOld, float* p_alphaNew, int1
 
 		// Find the ratio between the speed of the wheels
 		float ratio = speedWheelRatio(gama);
+		/*
 		chprintf((BaseSequentialStream *)&SD3, "ratio : %f", ratio);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		if(ratio > 1) {
 			set_led(LED7, 1);
 			set_led(LED3, 0);
@@ -218,7 +226,7 @@ void regulation(/*uint8_t captorNumber, int16_t* p_pOld, float* p_alphaNew, int1
 		right_motor_set_speed(rightSpeed);
 
 		// Save current position in a pointer for next iteration
-		//*p_pOld = pNew;
+		*p_pOld = pNew; // Peut-être qu'il faut changer ça
 
 		// Save the future angle alpha (robot - wall)
 		//*p_alphaNew = *p_alphaNew + gama;
@@ -231,21 +239,21 @@ void regulation(/*uint8_t captorNumber, int16_t* p_pOld, float* p_alphaNew, int1
 	}*/
 }
 
-float pid(/*int16_t* p_pOld,*/ int16_t pNew/*, int16_t* p_integral*/) {
+float pid(float pOld, float pNew, int16_t* p_integral) {
 
 	// Calculates the derivative
-	//int16_t deriv = (pNew - *p_pOld)/PERIOD_REGULATOR;
+	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
 	/*chprintf((BaseSequentialStream *)&SD3, "deriv : %d", deriv);
 	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 	// Calculates the integral and save the value in a pointer for next iteration
-	//*p_integral = *p_integral + pNew;
+	*p_integral = *p_integral + pNew;
 	/*chprintf((BaseSequentialStream *)&SD3, "integral : %d", *p_integral);
 	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 
 	// Calculates beta, the objective angle
-	return ((KP * pNew) /*+ (KI * (*p_integral)) + (KD * deriv)*/);
+	return ((KP * pNew) + (KI * (*p_integral)) + (KD * deriv));
 }
 
 
@@ -253,17 +261,21 @@ float speedWheelRatio(float gama) {
 
 	int16_t rRotRob = 1000; // *** a changer c'est moche !!!
 
-	if(gama >= 0) {
+	if(gama > 0) {
 		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
 	}
 
-	else {
+	else if(gama < 0) {
 		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
 	}
-	chprintf((BaseSequentialStream *)&SD3, "rRotRob : %d", rRotRob);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
+	// gama == 0
+	else {
+		return 1; // ratio wL/wR = 1 (the robot goes straight forward)
+	}
+	/*chprintf((BaseSequentialStream *)&SD3, "rRotRob : %d", rRotRob);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
 }
-
 
