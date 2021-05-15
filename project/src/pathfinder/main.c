@@ -31,19 +31,20 @@ int main(void)
     mpu_init();
 
     //starts the serial communication
-    //serial_start();
+    serial_start();
     //start the USB communication
     usb_start();
     //inits the motors
 	motors_init();
 
-
+#ifdef PROXIMITY
 	proximity_start();
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
 //	messagebus_topic_t *proximity_topic = messagebus_find_topic_blocking(&bus, "/proximity");
 	messagebus_find_topic_blocking(&bus, "/proximity");
 
 	calibrate_ir();
+#endif
 
 #ifdef AUDIO
 	//launchAudioThread

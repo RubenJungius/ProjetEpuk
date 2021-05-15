@@ -16,6 +16,7 @@
 #include <motors.h>
 #include "measurements.h"
 #include "regulator.h"
+#include "process_mic.h"
 
 #include "sensors/proximity.h"
 
@@ -52,18 +53,25 @@ static THD_FUNCTION(measurements_thd, arg){
 	// initial conditions
 	//int16_t integral = 0;
 	//int16_t pOld = - DIST_DETECTION + OFFSET;
-
+	int status = 0;
 	//uint8_t firstDetection = 1;
 
 	chMtxObjectInit(&mutex);
 	chCondObjectInit(&dataProduced);
 
 	while(1){
-		chMtxLock(&mutex);
-		measurements(2, &alpha);
-		chCondSignal(&dataProduced);
-		chMtxUnlock(&mutex);
-		chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
+		if(!status){
+			chMtxLock(mic_get_mutex());
+			chCondWait(mic_get_condition());
+			status = return_status();
+			chMtxUnlock(mic_get_mutex());
+		}else{
+			chMtxLock(&mutex);
+			measurements(2, &alpha);
+			chCondSignal(&dataProduced);
+			chMtxUnlock(&mutex);
+			chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
+		}
 	}
 }
 

@@ -19,6 +19,10 @@ static float micFront_output[FFT_SIZE];
 static int sequence_counter;
 static int sequence_timer;
 
+static mutex_t mutex;
+static condition_variable_t sequence_status;
+static int sequence_accept;
+
 #define MIN_VALUE_THRESHOLD	10000
 
 //frequency=position*15,625 	  max pos = 512 (8kHz)
@@ -30,7 +34,8 @@ static int sequence_timer;
 #define INTERVAL		1
 #define SEQUENCE_TIME 	2000
 #define MAX_FREQ		53//260	//we don't analyze after this index to not use resources for nothing
-void sound_remote(float* data){
+
+int sound_remote(float* data){
 	float max_norm = MIN_VALUE_THRESHOLD;
 	int16_t max_norm_index = -1;
 
@@ -59,18 +64,26 @@ void sound_remote(float* data){
 		sequence_counter = 0;
 
 	if(sequence_counter == 3){ //sequence accepted
-		set_body_led(1);
-		chThdSleepMilliseconds(1000);
+		chMtxLock(&mutex);
 		sequence_counter = 0;
-		set_body_led(0);
+		sequence_accept = 1;
+		//chprintf((BaseSequentialStream*)&SD3, "status: %d", sequence_accept);
+		chCondSignal(&sequence_status);
+		chMtxUnlock(&mutex);
+		chThdSetPriority(NORMALPRIO-1);
+		return 1;
 	}
 
-	chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
+	//chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
+	return 0;
 }
 
 void init_counter(){
 	sequence_counter = 0;
+	sequence_accept = 0;
 	sequence_timer = chVTGetSystemTime();
+	chMtxObjectInit(&mutex);
+	chCondObjectInit(&sequence_status);
 }
 
 /*
@@ -131,6 +144,18 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 
 		nb_samples = 0;
 
-		sound_remote(micFront_output);
+		if(sound_remote(micFront_output)){
+
+		}
 	}
+}
+mutex_t* mic_get_mutex() {
+	return &mutex;
+}
+
+condition_variable_t* mic_get_condition() {
+	return &sequence_status;
+}
+int return_status(){
+	return sequence_accept;
 }

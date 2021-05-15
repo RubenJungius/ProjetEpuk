@@ -17,6 +17,7 @@
 #include <leds.h>
 #include <motors.h>
 #include "measurements.h"
+#include "process_mic.h"
 
 #include "sensors/proximity.h"
 
@@ -100,15 +101,22 @@ static THD_FUNCTION(regulation_thd, arg){
 	//chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 
 	//chMtxObjectInit(get_mutex());
-
+	int status = 0;
 
 	while(1) {
-		chMtxLock(get_mutex());
-		chCondWait(get_condition());
-		regulation(/*2, */&pOld,/* &alphaNew,*/ &integral/*, &firstDetection*/);
-		chMtxUnlock(get_mutex());
-		//chThdYield();
-		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+		if(!status){
+			chMtxLock(mic_get_mutex());
+			chCondWait(mic_get_condition());
+			status = return_status();
+			chMtxUnlock(mic_get_mutex());
+		}else{
+			chMtxLock(get_mutex());
+			chCondWait(get_condition());
+			regulation(/*2, */&pOld,/* &alphaNew,*/ &integral/*, &firstDetection*/);
+			chMtxUnlock(get_mutex());
+			//chThdYield();
+			chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+		}
 	}
 }
 

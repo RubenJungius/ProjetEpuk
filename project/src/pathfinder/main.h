@@ -9,9 +9,10 @@ extern "C" {
 #include "msgbus/messagebus.h"
 #include "parameter/parameter.h"
 
-//#define AUDIO
+#define AUDIO
 #define DRIVE
 #define COLLISION
+#define PROXIMITY
 
 //constants for the differents parts of the project
 #define IMAGE_BUFFER_SIZE		640

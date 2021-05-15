@@ -19,5 +19,8 @@ typedef enum {
 
 void init_counter(void);
 void processAudioData(int16_t *data, uint16_t num_samples);
+mutex_t* mic_get_mutex(void);
+condition_variable_t* mic_get_condition(void);
+int return_status(void);
 
 #endif /* PROCESS_MIC_H_ */
