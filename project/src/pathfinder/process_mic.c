@@ -31,8 +31,8 @@ static int sequence_accept;
 #define FREQ_1			29	//453Hz
 #define FREQ_2			34	//531Hz
 #define FREQ_3			48	//750Hz
-#define INTERVAL		0
-#define SEQUENCE_TIME 	2000
+#define INTERVAL		0 //as we use a preset phone-audio file, no tolerance interval is needed
+#define SEQUENCE_TIME 	2000 //in milliseconds
 #define MAX_FREQ		53//260	//we don't analyze after this index to not use resources for nothing
 
 int sound_remote(float* data){
@@ -73,8 +73,7 @@ int sound_remote(float* data){
 		chThdSetPriority(NORMALPRIO-1);
 		return 1;
 	}
-
-	chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
+	//chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 	return 0;
 }
 
@@ -145,7 +144,10 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 		nb_samples = 0;
 
 		if(sound_remote(micFront_output)){
-
+			chThdSleepMilliseconds(5); //some mutex stuff :)
+			chMtxLock(&mutex);
+			chCondSignal(&sequence_status);
+			chMtxUnlock(&mutex);
 		}
 	}
 }

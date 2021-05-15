@@ -9,10 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
+#include "ch.h"
+#include <chprintf.h>
 
 #include "calibration.h"
 #include <leds.h>
+#include "main.h"
 #include <motors.h>
 #include "measurements.h"
 #include "regulator.h"
@@ -53,25 +55,30 @@ static THD_FUNCTION(measurements_thd, arg){
 	// initial conditions
 	//int16_t integral = 0;
 	//int16_t pOld = - DIST_DETECTION + OFFSET;
-	int status = 0;
 	//uint8_t firstDetection = 1;
 
 	chMtxObjectInit(&mutex);
 	chCondObjectInit(&dataProduced);
+#ifdef AUDIO
+	int status = 0;
+#else
+	int status = 1;
+#endif
 
 	while(1){
 		if(!status){
 			chMtxLock(mic_get_mutex());
 			chCondWait(mic_get_condition());
 			status = return_status();
+			chprintf((BaseSequentialStream*)&SD3, "Staus Measurement: %d", status);
 			chMtxUnlock(mic_get_mutex());
 		}else{
 			chMtxLock(&mutex);
 			measurements(2, &alpha);
 			chCondSignal(&dataProduced);
 			chMtxUnlock(&mutex);
-			chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
 		}
+		chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
 	}
 }
 

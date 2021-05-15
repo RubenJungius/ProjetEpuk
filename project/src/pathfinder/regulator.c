@@ -11,6 +11,7 @@
 #include <math.h>
 #include "ch.h"
 #include <chprintf.h>
+#include "main.h"
 
 #include "regulator.h"
 #include "calibration.h"
@@ -101,13 +102,19 @@ static THD_FUNCTION(regulation_thd, arg){
 	//chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 
 	//chMtxObjectInit(get_mutex());
+
+#ifdef AUDIO
 	int status = 0;
+#else
+	int status = 1;
+#endif
 
 	while(1) {
 		if(!status){
 			chMtxLock(mic_get_mutex());
 			chCondWait(mic_get_condition());
 			status = return_status();
+			chprintf((BaseSequentialStream *)&SD3, "Staus Regulateur: %d", status);
 			chMtxUnlock(mic_get_mutex());
 		}else{
 			chMtxLock(get_mutex());
@@ -115,13 +122,13 @@ static THD_FUNCTION(regulation_thd, arg){
 			regulation(/*2, */&pOld,/* &alphaNew,*/ &integral/*, &firstDetection*/);
 			chMtxUnlock(get_mutex());
 			//chThdYield();
-			chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 		}
+		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
 }
 
 void regulation_start() {
-	serial_start();
+	//serial_start();
 	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
 }
 
