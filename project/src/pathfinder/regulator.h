@@ -11,8 +11,6 @@
 #define DIAM_ROBOT 54 //mm (the diameter that matters is the one between the wheels)
 #define RADIUS_WHEEL 20.7 //mm
 
-#define MARGIN 5
-
 
 //#define MAX_SPEED_MM_S 130 // [mm/s]
 #define MOTOR_SPEED_LIMIT_MARGIN 1000 / 2 // [step/s]
@@ -35,9 +33,9 @@ void regulation_start(void);
 
 //PID
 
-void regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ int16_t* p_integral/* uint8_t* p_firstDetection*/, float* p_angleSum);
+int regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ float* p_integral/* uint8_t* p_firstDetection*/);
 
-float pid(float p_pOld, float pNew, int16_t* p_integral);
+float pid(float p_pOld, float pNew, float* p_integral);
 
 float speedWheelRatio(float gama);
 

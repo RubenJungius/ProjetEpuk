@@ -67,7 +67,7 @@ int sound_remote(float* data){
 		chMtxLock(&mutex);
 		sequence_counter = 0;
 		sequence_accept = 1;
-		//chprintf((BaseSequentialStream*)&SD3, "status: %d", sequence_accept);
+		chprintf((BaseSequentialStream*)&SD3, "status: %d", sequence_accept);
 		chCondSignal(&sequence_status);
 		chMtxUnlock(&mutex);
 		chThdSetPriority(NORMALPRIO-1);

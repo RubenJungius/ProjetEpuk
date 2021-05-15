@@ -23,8 +23,8 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_MEASUREMENTS 0.1 //sec
-#define PERIOD_MEASUREMENT 0.01 //sec
+#define PERIOD_MEASUREMENTS 0.05 //sec
+#define PERIOD_MEASUREMENT 0.005 //sec
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
 
 /*static void serial_start(void)

@@ -23,32 +23,16 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.14 // sec
+#define PERIOD_REGULATOR	 0.05 // sec
 #define R_ROT_ROB_MIN	 (DIAM_ROBOT/2)
 #define MAX_ANGLE_ROT	 (float)(MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
-#define OFFSET 		10 // mm, distance to the wall we want the robot to stabilize
+#define OFFSET 		20 // mm, distance to the wall we want the robot to stabilize
 
-#define KP 		20.0 * (float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
-#define	KI		0
+#define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
+#define	KI		0.0
 #define	KD		0 //0.01
-
-
-
-static void serial_start(void)
-{
-	static SerialConfig ser_cfg = {
-			115200,
-			0,
-			0,
-			0,
-	};
-
-	sdStart(&SD3, &ser_cfg); // UART3.
-}
-
-
 
 
 
@@ -94,16 +78,10 @@ static THD_FUNCTION(regulation_thd, arg){
 	chRegSetThreadName(__FUNCTION__);
 
 	// initial conditions
-	int16_t integral = 0;
+	static int angleSum = 0;
 	float pOld = - DIST_DETECTION + OFFSET;
-	float angleSum = 0;
-	//float alphaNew = 0;
-	//uint8_t firstDetection = 1;
-	//left_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
-	//right_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
-	//chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+	float integral = 0;
 
-	//chMtxObjectInit(get_mutex());
 
 #ifdef AUDIO
 	int status = 0;
@@ -121,50 +99,60 @@ static THD_FUNCTION(regulation_thd, arg){
 		}else{
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
-			regulation(&pOld, &integral, &angleSum);
+			double tmp = angleSum;
+			angleSum += regulation(&pOld, &integral);
+			chprintf((BaseSequentialStream *)&SD3, "angleSum : %d", /*regulation(&pOld, &integral));/*/angleSum);
+			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+			//angleSum = tmp;
 			chMtxUnlock(get_mutex());
-			//chThdYield();
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
 }
 
 void regulation_start() {
-	//serial_start();
 	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
 }
 
 
 /****** PID *******/
 
-
-void regulation(float* p_pOld, int16_t* p_integral, float* p_angleSum) {
+int regulation(float* p_pOld, float* p_integral) {
 
 	float pNew = ((float*)get_dist_data())[0] + OFFSET;
 	float alpha = get_alpha();
 
 	// wall approaching algorithm
-	if(pNew >= - DIST_DETECTION + OFFSET /*&& *p_angleSum < 0.18*/){
+	if(pNew >= - DIST_DETECTION + OFFSET){
+
+		// correction if something is seen by the captor 1
+		float dist2 = get_distance(get_prox(2));
+		float dist1 = get_distance(get_prox(1));
+		float correction = 0;
+		if(dist1 >= - DIST_DETECTION) {
+			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
+
+		}
+		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f, dist2 : %f, correction : %f", dist1, dist2, correction);
+		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		// Calculates beta, the objective angle
 		float beta = pid(*p_pOld, pNew, p_integral);
 
 		// Calculates the angle we want the robot to rotate
-		float gama = beta - alpha;
+		float gama = (beta - alpha) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > MAX_ANGLE_ROT) {
+		if(gama > MAX_ANGLE_ROT && abs(correction) < 10) {
 			gama = MAX_ANGLE_ROT;
 		}
-		if(gama < -MAX_ANGLE_ROT) {
+		if(gama < -MAX_ANGLE_ROT && abs(correction) < 10) {
 			gama = -MAX_ANGLE_ROT;
 		}
-		chprintf((BaseSequentialStream *)&SD3, "gama : %f", gama);
+		int tmp = (int)(gama*256);
+		chprintf((BaseSequentialStream *)&SD3, "gama : %f tmp: %d", gama, tmp);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-		// Sum of all the command angles
-		*p_angleSum = *p_angleSum + gama;
-		chprintf((BaseSequentialStream *)&SD3, "angleSum : %f", *p_angleSum);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
 
 		// Find the ratio between the speed of the wheels
 		float ratio = speedWheelRatio(gama);
@@ -194,20 +182,23 @@ void regulation(float* p_pOld, int16_t* p_integral, float* p_angleSum) {
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
+		return 1;
 	}
+	return 0;
 }
 
-float pid(float pOld, float pNew, int16_t* p_integral) {
+float pid(float pOld, float pNew, float* p_integral) {
 
 	// Calculates the derivative
 	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
+	/*
 	chprintf((BaseSequentialStream *)&SD3, "deriv : %f", deriv);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 	// Calculates the integral and save the value in a pointer for next iteration
 	*p_integral += pNew;
-	chprintf((BaseSequentialStream *)&SD3, "integral : %d", *p_integral);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+	/*chprintf((BaseSequentialStream *)&SD3, "integral : %f", *p_integral);
+	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 
 	// Calculates beta, the objective angle
@@ -234,3 +225,4 @@ float speedWheelRatio(float gama) {
 
 	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
 }
+

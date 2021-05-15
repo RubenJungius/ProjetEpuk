@@ -11,7 +11,7 @@ extern "C" {
 
 //#define AUDIO
 #define DRIVE
-//#define COLLISION
+#define COLLISION
 #define PROXIMITY
 
 //constants for the differents parts of the project
