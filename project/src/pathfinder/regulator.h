@@ -13,9 +13,9 @@
 
 
 //#define MAX_SPEED_MM_S 130 // [mm/s]
-#define MOTOR_SPEED_LIMIT_MARGIN 1000 / 2 // [step/s]
-#define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI / 2 // [rad/s]
-#define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130 / 2 // [mm/s]
+#define MOTOR_SPEED_LIMIT_MARGIN 1000 / 4 // [step/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI / 4 // [rad/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130 / 4 // [mm/s]
 
 
 /* Find the tab values against the raw value and return the proportional converted value from these 2 values in tenth of mm.
@@ -33,7 +33,7 @@ void regulation_start(void);
 
 //PID
 
-int regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ float* p_integral/* uint8_t* p_firstDetection*/);
+regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ float* p_integral/* uint8_t* p_firstDetection*/);
 
 float pid(float p_pOld, float pNew, float* p_integral);
 

@@ -23,15 +23,15 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.05 // sec
-#define R_ROT_ROB_MIN	 (DIAM_ROBOT/2)
-#define MAX_ANGLE_ROT	 (float)(MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
-#define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
+#define PERIOD_REGULATOR	 0.2 // sec
+#define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
+#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN)
+#define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
 #define OFFSET 		20 // mm, distance to the wall we want the robot to stabilize
 
 #define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
-#define	KI		0.0
+#define	KI		0.0000
 #define	KD		0 //0.01
 
 
@@ -99,14 +99,13 @@ static THD_FUNCTION(regulation_thd, arg){
 		}else{
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
-			double tmp = angleSum;
-			angleSum += regulation(&pOld, &integral);
-			chprintf((BaseSequentialStream *)&SD3, "angleSum : %d", /*regulation(&pOld, &integral));/*/angleSum);
-			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+			regulation(&pOld, &integral);
 			//angleSum = tmp;
 			chMtxUnlock(get_mutex());
+			set_led(LED1, 1);
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+		set_led(LED1, 0);
 	}
 }
 
@@ -117,7 +116,7 @@ void regulation_start() {
 
 /****** PID *******/
 
-int regulation(float* p_pOld, float* p_integral) {
+regulation(float* p_pOld, float* p_integral) {
 
 	float pNew = ((float*)get_dist_data())[0] + OFFSET;
 	float alpha = get_alpha();
@@ -129,13 +128,16 @@ int regulation(float* p_pOld, float* p_integral) {
 		float dist2 = get_distance(get_prox(2));
 		float dist1 = get_distance(get_prox(1));
 		float correction = 0;
-		if(dist1 >= - DIST_DETECTION) {
+		if(dist1 <= DIST_DETECTION) {
 			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
-
+			set_led(LED1, 1);
 		}
-		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f, dist2 : %f, correction : %f", dist1, dist2, correction);
-		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+		/*chprintf((BaseSequentialStream *)&SD3, "correction : %f", correction);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
+*/
+		chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		// Calculates beta, the objective angle
 		float beta = pid(*p_pOld, pNew, p_integral);
 
@@ -143,15 +145,17 @@ int regulation(float* p_pOld, float* p_integral) {
 		float gama = (beta - alpha) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > MAX_ANGLE_ROT && abs(correction) < 10) {
+		if(gama > MAX_ANGLE_ROT /*&& correction <= -30*/) {
 			gama = MAX_ANGLE_ROT;
 		}
-		if(gama < -MAX_ANGLE_ROT && abs(correction) < 10) {
+		if(gama < -MAX_ANGLE_ROT /*&& correction > 30*/) {
 			gama = -MAX_ANGLE_ROT;
 		}
 		int tmp = (int)(gama*256);
-		chprintf((BaseSequentialStream *)&SD3, "gama : %f tmp: %d", gama, tmp);
+
+		chprintf((BaseSequentialStream *)&SD3, "beta : %f, alpha: %f, gama: %f", beta, alpha, gama);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
 
 
 		// Find the ratio between the speed of the wheels
@@ -179,12 +183,9 @@ int regulation(float* p_pOld, float* p_integral) {
 
 		left_motor_set_speed(leftSpeed);
 		right_motor_set_speed(rightSpeed);
-
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
-		return 1;
 	}
-	return 0;
 }
 
 float pid(float pOld, float pNew, float* p_integral) {
