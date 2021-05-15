@@ -35,7 +35,7 @@ void regulation_start(void);
 
 //PID
 
-void regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ int16_t* p_integral/* uint8_t* p_firstDetection*/);
+void regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ int16_t* p_integral/* uint8_t* p_firstDetection*/, float* p_angleSum);
 
 float pid(float p_pOld, float pNew, int16_t* p_integral);
 
