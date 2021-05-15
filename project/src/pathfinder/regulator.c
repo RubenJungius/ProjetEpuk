@@ -12,6 +12,7 @@
 #include "ch.h"
 #include <chprintf.h>
 #include "main.h"
+#include "floatmath.h"
 
 #include "regulator.h"
 #include "calibration.h"
@@ -78,7 +79,8 @@ static THD_FUNCTION(regulation_thd, arg){
 	chRegSetThreadName(__FUNCTION__);
 
 	// initial conditions
-	static int angleSum = 0;
+	fixed_point angleSum = 0;
+	fixed_point full_circle = float_to_fixed(2*M_PI);
 	float pOld = - DIST_DETECTION + OFFSET;
 	float integral = 0;
 
@@ -99,11 +101,9 @@ static THD_FUNCTION(regulation_thd, arg){
 		}else{
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
-			double tmp = angleSum;
 			angleSum += regulation(&pOld, &integral);
-			chprintf((BaseSequentialStream *)&SD3, "angleSum : %d", /*regulation(&pOld, &integral));/*/angleSum);
+			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f", fixed_to_float(full_circle - angleSum));
 			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-			//angleSum = tmp;
 			chMtxUnlock(get_mutex());
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
@@ -117,45 +117,52 @@ void regulation_start() {
 
 /****** PID *******/
 
-int regulation(float* p_pOld, float* p_integral) {
+fixed_point regulation(float* p_pOld, float* p_integral) {
 
 	float pNew = ((float*)get_dist_data())[0] + OFFSET;
-	float alpha = get_alpha();
+
+	//float alpha = get_alpha();
+	fixed_point alpha = float_to_fixed(get_alpha());
 
 	// wall approaching algorithm
 	if(pNew >= - DIST_DETECTION + OFFSET){
 
 		// correction if something is seen by the captor 1
-		float dist2 = get_distance(get_prox(2));
-		float dist1 = get_distance(get_prox(1));
-		float correction = 0;
-		if(dist1 >= - DIST_DETECTION) {
-			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
-
+		//float dist2 = get_distance(get_prox(2));
+		fixed_point dist2 = float_to_fixed(get_distance(get_prox(2)));
+		//float dist1 = get_distance(get_prox(1));
+		fixed_point dist1 = float_to_fixed(get_distance(get_prox(1)));
+		fixed_point correction = 0;
+		//if(dist1 >= - DIST_DETECTION) {
+		if(dist1 >= int32_to_fixed(- DIST_DETECTION)) {
+			//correction = dist1 + 35 - sqrt(2)*(35 + dist2);
+			correction = dist1 + int32_to_fixed(35) - float_to_fixed(sqrt(2)*(35 + dist2));
 		}
 		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f, dist2 : %f, correction : %f", dist1, dist2, correction);
 		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		// Calculates beta, the objective angle
-		float beta = pid(*p_pOld, pNew, p_integral);
+		//float beta = pid(*p_pOld, pNew, p_integral);
+		fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
 
 		// Calculates the angle we want the robot to rotate
-		float gama = (beta - alpha) /*- 0.1 * (correction)*/;
+		//float gama = (beta - alpha) /*- 0.1 * (correction)*/;
+		fixed_point gama = (beta - alpha) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > MAX_ANGLE_ROT && abs(correction) < 10) {
-			gama = MAX_ANGLE_ROT;
+		if(fixed_to_float(gama) > MAX_ANGLE_ROT && abs(correction) < 10) {
+			gama = float_to_fixed(MAX_ANGLE_ROT);
 		}
-		if(gama < -MAX_ANGLE_ROT && abs(correction) < 10) {
-			gama = -MAX_ANGLE_ROT;
+		if(fixed_to_float(gama) < -MAX_ANGLE_ROT && abs(correction) < 10) {
+			gama = float_to_fixed(-MAX_ANGLE_ROT);
 		}
-		int tmp = (int)(gama*256);
-		chprintf((BaseSequentialStream *)&SD3, "gama : %f tmp: %d", gama, tmp);
+		chprintf((BaseSequentialStream *)&SD3, "gama : %f tmp: %d", fixed_to_float(gama));
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
 		// Find the ratio between the speed of the wheels
-		float ratio = speedWheelRatio(gama);
+		//float ratio = speedWheelRatio(gama);
+		fixed_point ratio = float_to_fixed(speedWheelRatio(gama));
 
 		if(ratio > 1) {
 			set_led(LED7, 1);
@@ -169,7 +176,7 @@ int regulation(float* p_pOld, float* p_integral) {
 		// Give the commands to the motor
 		int16_t rightSpeed = MOTOR_SPEED_LIMIT_MARGIN;
 		int16_t leftSpeed = MOTOR_SPEED_LIMIT_MARGIN;
-		if(gama >= 0) {
+		if(fixed_to_float(gama) >= 0) {
 			leftSpeed = ratio * rightSpeed;
 		}
 
@@ -182,7 +189,7 @@ int regulation(float* p_pOld, float* p_integral) {
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
-		return 1;
+		return gama;
 	}
 	return 0;
 }

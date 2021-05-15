@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "floatmath.h"
 
 #include "ch.h"
 #include "hal.h"
