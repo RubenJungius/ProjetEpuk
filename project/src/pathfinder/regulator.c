@@ -66,7 +66,7 @@ void angle_positioning(float angle) {
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	left_motor_set_speed(-speed);
 	right_motor_set_speed(speed);
-	chThdSleepMilliseconds(/*fixed_to_int32(T) */ 1000);
+	chThdSleepMilliseconds(T * 1000);
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
 }
@@ -101,11 +101,9 @@ static THD_FUNCTION(regulation_thd, arg){
 		}else{
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
-			double tmp = angleSum;
 			angleSum += regulation(&pOld, &integral);
-			chprintf((BaseSequentialStream *)&SD3, "angleSum : %d", /*regulation(&pOld, &integral));/*/angleSum);
+			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(full_circle - angleSum));
 			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-			//angleSum = tmp;
 			chMtxUnlock(get_mutex());
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
@@ -148,17 +146,16 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 
 		// Calculates the angle we want the robot to rotate
 		//float gama = (beta - alpha) /*- 0.1 * (correction)*/;
-		fixed_point gama = (beta - alpha) /*- 0.1 * (correction)*/;
+		fixed_point gama = (beta - float_to_fixed(alpha)) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > MAX_ANGLE_ROT && abs(correction) < 10) {
-			gama = MAX_ANGLE_ROT;
+		if(gama > float_to_fixed(MAX_ANGLE_ROT)) {
+			gama = float_to_fixed(MAX_ANGLE_ROT);
 		}
-		if(gama < -MAX_ANGLE_ROT && abs(correction) < 10) {
-			gama = -MAX_ANGLE_ROT;
+		if(gama < float_to_fixed(-MAX_ANGLE_ROT)) {
+			gama = float_to_fixed(-MAX_ANGLE_ROT);
 		}
-		int tmp = (int)(gama*256);
-		chprintf((BaseSequentialStream *)&SD3, "gama : %f tmp: %d", gama, tmp);
+		chprintf((BaseSequentialStream *)&SD3, "gama(fixed, float) : %d, %f", gama, fixed_to_float(gama));
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
@@ -190,8 +187,9 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
-		return 1;
+		return gama;
 	}
+	return 0;
 }
 
 float pid(float pOld, float pNew, float* p_integral) {

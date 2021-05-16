@@ -33,7 +33,7 @@ void regulation_start(void);
 
 //PID
 
-int regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ float* p_integral/* uint8_t* p_firstDetection*/);
+fixed_point regulation(float* p_pOld, float* p_integral);
 
 float pid(float p_pOld, float pNew, float* p_integral);
 
