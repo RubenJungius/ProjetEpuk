@@ -27,13 +27,13 @@
 #define PERIOD_REGULATOR	 0.2 // sec
 #define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
-#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN)
+#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
-#define OFFSET 		15 // mm, distance to the wall we want the robot to stabilize
+#define OFFSET 		25 // mm, distance to the wall we want the robot to stabilize
 
 #define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
-#define	KI		0.0000
-#define	KD		0 //0.01
+#define	KI		0  // useless in our case
+#define	KD		0  // useless in our case
 
 
 
@@ -96,7 +96,6 @@ static THD_FUNCTION(regulation_thd, arg){
 			chMtxLock(mic_get_mutex());
 			chCondWait(mic_get_condition());
 			status = return_status();
-			chprintf((BaseSequentialStream *)&SD3, "Staus Regulateur: %d", status);
 			chMtxUnlock(mic_get_mutex());
 		}else{
 			chMtxLock(get_mutex());
@@ -118,7 +117,7 @@ void regulation_start() {
 }
 
 
-/****** PID *******/
+/****** REGULATOR *******/
 
 fixed_point regulation(float* p_pOld, float* p_integral) {
 
@@ -128,46 +127,34 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 	// wall approaching algorithm
 	if(pNew >= - DIST_DETECTION + OFFSET){
 
-		// correction if something is seen by the captor 1
-		//float dist2 = get_distance(get_prox(2)); //distance captor on the wheel
-		float dist1 = get_distance(get_prox(1)); // distance captor on the diagonal
-		/*float correction = 0;
-		if(dist1 <= DIST_DETECTION) {
-			float mu = (M_PI/4) + alpha;
-			float distTh1 = ((pNew + 35.0) / cos(mu)) - 35.0;
-			correction = dist1 - distTh1;
-			//set_led(LED1, 1);
-		}*/
+		// is there a big curve ?
+		float dist1 = get_distance(get_prox(1)); // distance seen by the captor on the diagonal
+		uint8_t big_curve = 0;
+		if(dist1 < 15) {
+			 big_curve = 1;
+		}
+
+
 		chprintf((BaseSequentialStream *)&SD3, "dist1 : %f", dist1);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
-
-
-		/*chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		// Calculates beta, the objective angle
-		//fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
 		float beta = pid(*p_pOld, pNew, p_integral);
+
 		// Calculates the angle we want the robot to rotate
-		float gama = (beta - alpha) /*- 0.1 * (correction)*/;
-		//fixed_point gama = (beta - float_to_fixed(alpha)) /*- 0.1 * (correction)*/;
+		float gama = (beta - alpha);
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > MAX_ANGLE_ROT && dist1 >= 20) {
+		if(gama > MAX_ANGLE_ROT) {
 			gama = MAX_ANGLE_ROT;
 		}
-		if(gama < -MAX_ANGLE_ROT && dist1 >= 20) {
+		if(gama < -MAX_ANGLE_ROT) {
 			gama = -MAX_ANGLE_ROT;
 		}
-		if(dist1 < 20){
-			gama = MAX_ANGLE_ROT * 4; //magic number
-		}
-		chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
-		// Find the ratio between the speed of the wheels
+		// Find the ratio between the speeds of the wheels
 		float ratio = speedWheelRatio(gama);
 
 		if(ratio > 1) {
@@ -182,22 +169,27 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		// Give the commands to the motor
 		int16_t rightSpeed = MOTOR_SPEED_LIMIT_MARGIN;
 		int16_t leftSpeed = MOTOR_SPEED_LIMIT_MARGIN;
-		if(gama >= 0) {
+		if(gama >= 0 && !big_curve) {
 			leftSpeed = ratio * rightSpeed;
 		}
 
-		else {
+		else if(gama < 0 && !big_curve) {
 			rightSpeed = leftSpeed / ratio;
 		}
-		if(dist1 < 20) {
-			leftSpeed = leftSpeed / 2;
-			rightSpeed = rightSpeed / 2;
+		// there is a big curve ! the robot need to rotate fast (rotation on itself) => R_ROT_ROB_MIN = 0
+		else {
+			leftSpeed = - MOTOR_SPEED_LIMIT_MARGIN;
+			gama = (float)(MAX_DIST_ONE_CYCLE) / (float)((DIAM_ROBOT/2));
 		}
 		left_motor_set_speed(leftSpeed);
 		right_motor_set_speed(rightSpeed);
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
+
+
+		chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		return float_to_fixed(gama);
 	}
 	return 0;
@@ -224,7 +216,7 @@ float pid(float pOld, float pNew, float* p_integral) {
 
 float speedWheelRatio(float gama) {
 
-	int16_t rRotRob = 1000; // *** a changer c'est moche !!!
+	int16_t rRotRob = 0;
 
 	if(gama > 0) {
 		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
