@@ -8,6 +8,16 @@
 #ifndef REGULATOR_H_
 #define REGULATOR_H_
 
+#define DIAM_ROBOT 54 //mm (the diameter that matters is the one between the wheels)
+#define RADIUS_WHEEL 20.7 //mm
+
+
+//#define MAX_SPEED_MM_S 130 // [mm/s]
+#define MOTOR_SPEED_LIMIT_MARGIN 1000 / 4 // [step/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI / 4 // [rad/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130 / 4 // [mm/s]
+
+
 /* Find the tab values against the raw value and return the proportional converted value from these 2 values in tenth of mm.
    If the raw value is not in the tab values interval, it returns 0. */
 fixed_point get_distance(uint16_t rawValue);

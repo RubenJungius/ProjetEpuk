@@ -82,9 +82,7 @@ void find_alpha(fixed_point* p_alpha) {
 	fixed_point angle[RECORDED_MEASUREMENTS_NUMBER - 2];
 	fixed_point angleSum = 0;
 	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 1 ; i--) {
-		float a = fixed_to_float(pastMeasurements[i]);
-		float b = fixed_to_float(pastMeasurements[i-2]);
-		angle[i] = float_to_fixed(atan((a-b)/(float)(2*MAX_DIST_ONE_CYCLE_MEASUREMENT)));//calculation by float since tanget
+		angle[i] = asin((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(MAX_DIST_ONE_CYCLE));
 		angleSum += angle[i];
 	}
 	*p_alpha = fix_div(angleSum, int32_to_fixed(2));
