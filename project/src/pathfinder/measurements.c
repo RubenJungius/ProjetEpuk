@@ -105,7 +105,7 @@ void find_alpha(float* p_alpha) {
 	float angle[RECORDED_MEASUREMENTS_NUMBER - 2];
 	float angleSum = 0;
 	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 1 ; i--) {
-		angle[i] = asin((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(MAX_DIST_ONE_CYCLE));
+		angle[i] = atan((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(2*MAX_DIST_ONE_CYCLE));
 		angleSum += angle[i];
 	}
 	*p_alpha = angleSum / (float)2;

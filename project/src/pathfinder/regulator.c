@@ -29,7 +29,7 @@
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
 #define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN)
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
-#define OFFSET 		20 // mm, distance to the wall we want the robot to stabilize
+#define OFFSET 		15 // mm, distance to the wall we want the robot to stabilize
 
 #define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
 #define	KI		0.0000
@@ -121,31 +121,27 @@ void regulation_start() {
 
 fixed_point regulation(float* p_pOld, float* p_integral) {
 
-	float pNew = ((float*)get_dist_data())[0] + OFFSET;
-
-	//float alpha = get_alpha();
-	fixed_point alpha = float_to_fixed(get_alpha());
+	float alpha = get_alpha();
+	float pNew = (((float*)get_dist_data())[0] + OFFSET) * cos(alpha);
 
 	// wall approaching algorithm
 	if(pNew >= - DIST_DETECTION + OFFSET){
 
 		// correction if something is seen by the captor 1
-		//float dist2 = get_distance(get_prox(2));
-		fixed_point dist2 = float_to_fixed(get_distance(get_prox(2)));
-		//float dist1 = get_distance(get_prox(1));
-		fixed_point dist1 = float_to_fixed(get_distance(get_prox(1)));
-		fixed_point correction = 0;
-		//if(dist1 >= - DIST_DETECTION) {
-		if(dist1 >= int32_to_fixed(- DIST_DETECTION)) {
-			//correction = dist1 + 35 - sqrt(2)*(35 + dist2);
-			correction = dist1 + int32_to_fixed(35) - float_to_fixed(sqrt(2)*(35 + dist2));
+		float dist2 = get_distance(get_prox(2));
+		float dist1 = get_distance(get_prox(1));
+		float correction = 0;
+		if(dist1 <= DIST_DETECTION) {
+
+			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
+			set_led(LED1, 1);
 		}
-		/*chprintf((BaseSequentialStream *)&SD3, "correction : %f", correction);
+		chprintf((BaseSequentialStream *)&SD3, "correction : %f", correction);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
-*/
-		chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
+		/*chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		// Calculates beta, the objective angle
 		//float beta = pid(*p_pOld, pNew, p_integral);
 		fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
