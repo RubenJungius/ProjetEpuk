@@ -85,7 +85,6 @@ int fft_c(int lx, complex_float* cx, float signi)
 void doFFT_optimized(uint16_t size, float* complex_buffer){
 	if(size == 1024)
 		arm_cfft_f32(&arm_cfft_sR_f32_len1024, complex_buffer, 0, 1);
-	
 }
 
 /*
