@@ -12,7 +12,6 @@
 #include "ch.h"
 #include <chprintf.h>
 #include "main.h"
-#include "floatmath.h"
 
 #include "regulator.h"
 #include "calibration.h"
@@ -126,22 +125,24 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 	if(pNew >= - DIST_DETECTION + OFFSET){
 
 		// correction if something is seen by the captor 1
-		float dist2 = get_distance(get_prox(2));
-		float dist1 = get_distance(get_prox(1));
-		float correction = 0;
+		//float dist2 = get_distance(get_prox(2)); //distance captor on the wheel
+		float dist1 = get_distance(get_prox(1)); // distance captor on the diagonal
+		/*float correction = 0;
 		if(dist1 <= DIST_DETECTION) {
-
-			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
-			set_led(LED1, 1);
-		}
-		chprintf((BaseSequentialStream *)&SD3, "correction : %f", correction);
+			float mu = (M_PI/4) + alpha;
+			float distTh1 = ((pNew + 35.0) / cos(mu)) - 35.0;
+			correction = dist1 - distTh1;
+			//set_led(LED1, 1);
+		}*/
+		chprintf((BaseSequentialStream *)&SD3, "dist1 : %f", dist1);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
+
 
 
 		/*chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		// Calculates beta, the objective angle
-		//float beta = pid(*p_pOld, pNew, p_integral);
 		fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
 
 		// Calculates the angle we want the robot to rotate
@@ -149,11 +150,14 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		fixed_point gama = (beta - float_to_fixed(alpha)) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > float_to_fixed(MAX_ANGLE_ROT)) {
+		if(gama > float_to_fixed(MAX_ANGLE_ROT) && dist1 >= 20) {
 			gama = float_to_fixed(MAX_ANGLE_ROT);
 		}
-		if(gama < float_to_fixed(-MAX_ANGLE_ROT)) {
+		if(gama < float_to_fixed(-MAX_ANGLE_ROT) && dist1 >= 20) {
 			gama = float_to_fixed(-MAX_ANGLE_ROT);
+		}
+		if(dist1 < 20){
+			gama = float_to_fixed(MAX_ANGLE_ROT * 4); //magic number
 		}
 		chprintf((BaseSequentialStream *)&SD3, "gama(fixed, float) : %d, %f", gama, fixed_to_float(gama));
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
@@ -174,14 +178,17 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		// Give the commands to the motor
 		int16_t rightSpeed = MOTOR_SPEED_LIMIT_MARGIN;
 		int16_t leftSpeed = MOTOR_SPEED_LIMIT_MARGIN;
-		if(fixed_to_float(gama) >= 0) {
+		if(gama >= 0) {
 			leftSpeed = ratio * rightSpeed;
 		}
 
 		else {
 			rightSpeed = leftSpeed / ratio;
 		}
-
+		if(dist1 < 20) {
+			leftSpeed = leftSpeed / 2;
+			rightSpeed = rightSpeed / 2;
+		}
 		left_motor_set_speed(leftSpeed);
 		right_motor_set_speed(rightSpeed);
 

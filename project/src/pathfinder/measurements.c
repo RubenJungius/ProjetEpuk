@@ -11,7 +11,6 @@
 #include <math.h>
 #include "ch.h"
 #include <chprintf.h>
-#include "floatmath.h"
 
 #include "calibration.h"
 #include <leds.h>
