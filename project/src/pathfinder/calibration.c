@@ -63,7 +63,7 @@ float get_distance(uint16_t rawValue) {
 		return 0;
 	}
 	// far from an obstacle
-	else return int32_to_fixed(MEASUREMENT_NUMBER + 3);
+	else return (float)(MEASUREMENT_NUMBER + 3);
 }
 
 uint16_t speed_conversion(uint8_t speed_mm_s) {

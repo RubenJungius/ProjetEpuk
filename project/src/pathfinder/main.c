@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "floatmath.h"
 #include "ch.h"
 #include "hal.h"
 #include "memory_protection.h"
@@ -15,6 +16,7 @@
 #include "regulator.h"
 #include "communications.h"
 #include "collision_detect.h"
+
 
 #include <audio/microphone.h>
 #include <process_mic.h>
@@ -59,7 +61,7 @@ int main(void)
 
 	/* Return to the initial position */
 	dist_positioning(MEASUREMENT_NUMBER );
-	angle_positioning(fix_div(float_to_fixed(M_PI), float_to_fixed(2.25))); // 80 deg attention magic number
+	angle_positioning(M_PI/2.25); // 80 deg attention magic number
 
 	//launch thread
 	measurements_start();

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include "ch.h"
+#include "floatmath.h"
 #include <chprintf.h>
 #include "main.h"
 
@@ -39,11 +40,11 @@
 void dist_positioning(uint16_t frontDist) {
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	// move forward
-	if (fixed_to_int32(get_distance(get_prox(0))) > frontDist) {
+	if (get_distance(get_prox(0)) > frontDist) {
 		left_motor_set_speed(speed);
 		right_motor_set_speed(speed);
 		set_led(LED1, 1);
-		while (fixed_to_int32(get_distance(get_prox(0))) >= frontDist) {}
+		while (get_distance(get_prox(0)) >= frontDist) {}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		set_led(LED1, 0);
@@ -53,7 +54,7 @@ void dist_positioning(uint16_t frontDist) {
 		left_motor_set_speed(-speed);
 		right_motor_set_speed(-speed);
 		set_led(LED5, 1);
-		while (fixed_to_int32(get_distance(get_prox(0))) <= frontDist) {}
+		while (get_distance(get_prox(0)) <= frontDist) {}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		set_led(LED5, 0);
@@ -103,6 +104,9 @@ static THD_FUNCTION(regulation_thd, arg){
 			angleSum += regulation(&pOld, &integral);
 			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(full_circle - angleSum));
 			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+			if(angleSum >= full_circle) {
+				set_body_led(1);
+			}
 			chMtxUnlock(get_mutex());
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
@@ -143,23 +147,23 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		/*chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		// Calculates beta, the objective angle
-		fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
-
+		//fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
+		float beta = pid(*p_pOld, pNew, p_integral);
 		// Calculates the angle we want the robot to rotate
-		//float gama = (beta - alpha) /*- 0.1 * (correction)*/;
-		fixed_point gama = (beta - float_to_fixed(alpha)) /*- 0.1 * (correction)*/;
+		float gama = (beta - alpha) /*- 0.1 * (correction)*/;
+		//fixed_point gama = (beta - float_to_fixed(alpha)) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(gama > float_to_fixed(MAX_ANGLE_ROT) && dist1 >= 20) {
-			gama = float_to_fixed(MAX_ANGLE_ROT);
+		if(gama > MAX_ANGLE_ROT && dist1 >= 20) {
+			gama = MAX_ANGLE_ROT;
 		}
-		if(gama < float_to_fixed(-MAX_ANGLE_ROT) && dist1 >= 20) {
-			gama = float_to_fixed(-MAX_ANGLE_ROT);
+		if(gama < -MAX_ANGLE_ROT && dist1 >= 20) {
+			gama = -MAX_ANGLE_ROT;
 		}
 		if(dist1 < 20){
-			gama = float_to_fixed(MAX_ANGLE_ROT * 4); //magic number
+			gama = MAX_ANGLE_ROT * 4; //magic number
 		}
-		chprintf((BaseSequentialStream *)&SD3, "gama(fixed, float) : %d, %f", gama, fixed_to_float(gama));
+		chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 
@@ -194,7 +198,7 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
-		return gama;
+		return float_to_fixed(gama);
 	}
 	return 0;
 }

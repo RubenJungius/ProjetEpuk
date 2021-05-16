@@ -11,6 +11,7 @@
 #include <math.h>
 #include "ch.h"
 #include <chprintf.h>
+#include "floatmath.h"
 
 #include "calibration.h"
 #include <leds.h>
@@ -26,19 +27,6 @@
 #define PERIOD_MEASUREMENTS 0.2 //sec
 #define PERIOD_MEASUREMENT 0.025 //sec
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
-
-/*static void serial_start(void)
-{
-	static SerialConfig ser_cfg = {
-			115200,
-			0,
-			0,
-			0,
-	};
-
-	sdStart(&SD3, &ser_cfg); // UART3.
-}*/
-
 
 float pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
 float alpha = 0;
