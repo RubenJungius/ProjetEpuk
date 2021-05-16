@@ -13,7 +13,6 @@
 #include <chprintf.h>
 #include "main.h"
 #include "floatmath.h"
-#include "constants.h"
 
 #include "regulator.h"
 #include "calibration.h"
@@ -25,15 +24,15 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.05 // sec
-#define R_ROT_ROB_MIN	 (DIAM_ROBOT/2)
-#define MAX_ANGLE_ROT	 (float)(MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
-#define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
+#define PERIOD_REGULATOR	 0.2 // sec
+#define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
-#define OFFSET 		20 // mm, distance to the wall we want the robot to stabilize
+#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN)
+#define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
+#define OFFSET 		15 // mm, distance to the wall we want the robot to stabilize
 
 #define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
-#define	KI		0.0
+#define	KI		0.0000
 #define	KD		0 //0.01
 
 
@@ -62,10 +61,8 @@ void dist_positioning(uint16_t frontDist) {
 	}
 }
 
-void angle_positioning(fixed_point angle) {
-	fixed_point temp = fix_mult(int32_to_fixed(DIAM_ROBOT/2), angle);
-	fixed_point T = fix_div(temp, float_to_fixed(MOTOR_SPEED_LIMIT_MARGIN_MM_S));
-			//(float)((DIAM_ROBOT/2) * angle) / ((float)MOTOR_SPEED_LIMIT_MARGIN_MM_S);
+void angle_positioning(float angle) {
+	float T = (float)((DIAM_ROBOT/2) * angle) / ((float)MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	left_motor_set_speed(-speed);
 	right_motor_set_speed(speed);
@@ -84,8 +81,8 @@ static THD_FUNCTION(regulation_thd, arg){
 	// initial conditions
 	fixed_point angleSum = 0;
 	fixed_point full_circle = float_to_fixed(2*M_PI);
-	fixed_point pOld = float_to_fixed(- DIST_DETECTION + OFFSET);
-	fixed_point integral = 0;
+	float pOld = - DIST_DETECTION + OFFSET;
+	float integral = 0;
 
 
 #ifdef AUDIO
@@ -122,31 +119,35 @@ void regulation_start() {
 
 /****** PID *******/
 
-int regulation(float* p_pOld, float* p_integral) {
+fixed_point regulation(float* p_pOld, float* p_integral) {
 
-	float pNew = ((float*)get_dist_data())[0] + OFFSET;
+	float alpha = get_alpha();
+	float pNew = (((float*)get_dist_data())[0] + OFFSET) * cos(alpha);
 
-	//float alpha = get_alpha();
-	fixed_point alpha = float_to_fixed(get_alpha());
-
-	fixed_point alpha = float_to_fixed(get_alpha());
-	fixed_point pNew = ((get_dist_data())[0] + int32_to_fixed(OFFSET))*float_to_fixed(cos(fixed_to_float(alpha)));
+	// wall approaching algorithm
+	if(pNew >= - DIST_DETECTION + OFFSET){
 
 		// correction if something is seen by the captor 1
 		float dist2 = get_distance(get_prox(2));
 		float dist1 = get_distance(get_prox(1));
 		float correction = 0;
-		if(dist1 >= - DIST_DETECTION) {
+		if(dist1 <= DIST_DETECTION) {
+
 			correction = dist1 + 35 - sqrt(2)*(35 + dist2);
-
+			set_led(LED1, 1);
 		}
-		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f, dist2 : %f, correction : %f", dist1, dist2, correction);
-		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+		chprintf((BaseSequentialStream *)&SD3, "correction : %f", correction);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
+
+		/*chprintf((BaseSequentialStream *)&SD3, "pnew : %f", pNew);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 		// Calculates beta, the objective angle
 		//float beta = pid(*p_pOld, pNew, p_integral);
 		fixed_point beta = float_to_fixed(pid(*p_pOld, pNew, p_integral));
 
+		// Calculates the angle we want the robot to rotate
+		//float gama = (beta - alpha) /*- 0.1 * (correction)*/;
 		fixed_point gama = (beta - alpha) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
@@ -191,13 +192,12 @@ int regulation(float* p_pOld, float* p_integral) {
 		*p_pOld = pNew;
 		return 1;
 	}
-	return 0;
 }
 
-fixed_point pid(fixed_point pOld, fixed_point pNew, fixed_point* p_integral) {
+float pid(float pOld, float pNew, float* p_integral) {
 
 	// Calculates the derivative
-	fixed_point deriv = (pNew - pOld)/(PERIOD_REGULATOR);
+	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
 	/*
 	chprintf((BaseSequentialStream *)&SD3, "deriv : %f", deriv);
 	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
@@ -213,24 +213,22 @@ fixed_point pid(fixed_point pOld, fixed_point pNew, fixed_point* p_integral) {
 }
 
 
-fixed_point speedWheelRatio(fixed_point gama) {
+float speedWheelRatio(float gama) {
 
-	fixed_point rRotRob = 0;
+	int16_t rRotRob = 1000; // *** a changer c'est moche !!!
 
 	if(gama > 0) {
-		//rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
-		rRotRob = fix_div(float_to_fixed(MAX_DIST_ONE_CYCLE),gama)-int32_to_fixed(DIAM_ROBOT/2);
+		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
 	}
 
 	else if(gama < 0) {
-		//rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
-		rRotRob = fix_div(float_to_fixed(MAX_DIST_ONE_CYCLE),gama)+int32_to_fixed(DIAM_ROBOT/2);
+		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
 	}
 
 	// gama == 0
 	else {
-		return int32_to_fixed(1); // ratio wL/wR = 1 (the robot goes straight forward)
+		return 1; // ratio wL/wR = 1 (the robot goes straight forward)
 	}
-	//return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
-	return fix_div(rRotRob - int32_to_fixed(DIAM_ROBOT/2), rRotRob + int32_to_fixed(DIAM_ROBOT/2)); // wL/wR
+
+	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
 }

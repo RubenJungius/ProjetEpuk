@@ -20,13 +20,13 @@
 
 /* Find the tab values against the raw value and return the proportional converted value from these 2 values in tenth of mm.
    If the raw value is not in the tab values interval, it returns 0. */
-fixed_point get_distance(uint16_t rawValue);
+float get_distance(uint16_t rawValue);
 
 /* Position the robot according to a given distance between the front captor and an obstacle in mm.*/
 void dist_positioning(uint16_t frontDist);
 
 /* angular positioning of the robot */
-void angle_positioning(fixed_point angle);
+void angle_positioning(float angle);
 
 //wrapper to launch thread
 void regulation_start(void);
@@ -35,9 +35,9 @@ void regulation_start(void);
 
 int regulation(/*uint8_t captorNumber,*/ float* p_pOld,/* float* p_alphaNew,*/ float* p_integral/* uint8_t* p_firstDetection*/);
 
-fixed_point pid(fixed_point p_pOld, fixed_point pNew, fixed_point* p_integral);
+float pid(float p_pOld, float pNew, float* p_integral);
 
-fixed_point speedWheelRatio(fixed_point gama);
+float speedWheelRatio(float gama);
 
 
 #endif /* REGULATOR_H_ */

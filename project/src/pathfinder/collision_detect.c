@@ -5,7 +5,6 @@
 #include "ch.h"
 
 #include "collision_detect.h"
-#include "floatmath.h"
 #include "calibration.h"
 #include <leds.h>
 #include <motors.h>

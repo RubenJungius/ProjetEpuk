@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "floatmath.h"
-#include "constants.h"
 
 #include "calibration.h"
 #include <motors.h>
@@ -51,14 +49,13 @@ void calibration() {
 	set_led(LED1, 0);
 }
 
-fixed_point get_distance(uint16_t rawValue) {
+float get_distance(uint16_t rawValue) {
 	for(int i = 0; i < MEASUREMENT_NUMBER - 1; i++) {
 		// Find the closest values in the tab and return the proportional converted result.
 		if((rawValue <= conversionTab[i][1]) && (rawValue > conversionTab[i + 1][1])) {
 			uint16_t interval = conversionTab[i][1] - conversionTab[i + 1][1];
 			uint16_t a = conversionTab[i][1] - rawValue;
-			return int32_to_fixed(conversionTab[i][0]) + fix_div(int32_to_fixed(a), int32_to_fixed(interval));
-	//				((float)a/(float)interval);
+			return conversionTab[i][0] + ((float)a/(float)interval);
 		}
 	}
 	// very close to an obstacle

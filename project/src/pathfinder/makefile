@@ -9,15 +9,15 @@ GLOBAL_PATH = ../../lib/e-puck2_main-processor
 
 #Source files to include
 CSRC += ./main.c \
-		./floatmath.c \
-		./regulator.c \
 		./calibration.c \
+		./regulator.c \
 		./measurements.c \
 		./communications.c \
 		./process_mic.c \
 		./fft.c \
 		./collision_detect.c \
-		
+		./floatmath.c
+
 #		./pi_regulator.c \
 #		./process_image.c \
 		
