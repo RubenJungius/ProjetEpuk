@@ -34,6 +34,7 @@ void regulation_start(void);
 //PID
 
 int regulator_return_status(void);
+int regulator_return_count(void);
 
 fixed_point regulation(float* p_pOld, float* p_integral);
 

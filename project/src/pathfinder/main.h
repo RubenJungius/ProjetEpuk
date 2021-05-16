@@ -9,7 +9,7 @@ extern "C" {
 #include "msgbus/messagebus.h"
 #include "parameter/parameter.h"
 
-//#define AUDIO
+#define AUDIO
 #define DRIVE
 #define COLLISION
 #define PROXIMITY

@@ -50,15 +50,20 @@ int sound_remote(float* data){
 	//launch sequence
 	if(sequence_counter == 0){
 		if(max_norm_index >= FREQ_1 - INTERVAL && max_norm_index <= FREQ_1 + INTERVAL){
+			chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 			sequence_counter++;
 			sequence_timer=chVTGetSystemTime();
 		}
 	}else if(sequence_counter == 1){
-		if(max_norm_index >= FREQ_2 - INTERVAL && max_norm_index <= FREQ_2 + INTERVAL)
+		if(max_norm_index >= FREQ_2 - INTERVAL && max_norm_index <= FREQ_2 + INTERVAL){
+			chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 			sequence_counter++;
+		}
 	}else if(sequence_counter == 2){
-		if(max_norm_index >= FREQ_3 - INTERVAL && max_norm_index <= FREQ_3 + INTERVAL)
+		if(max_norm_index >= FREQ_3 - INTERVAL && max_norm_index <= FREQ_3 + INTERVAL){
+			chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 			sequence_counter++;
+		}
 	}
 	if(sequence_counter != 0 && chVTTimeElapsedSinceX(sequence_timer) > SEQUENCE_TIME)
 		sequence_counter = 0;
@@ -70,10 +75,9 @@ int sound_remote(float* data){
 		chprintf((BaseSequentialStream*)&SD3, "status: %d", sequence_accept);
 		chCondSignal(&sequence_status);
 		chMtxUnlock(&mutex);
-		chThdSetPriority(NORMALPRIO-1);
+		//chThdSetPriority(NORMALPRIO-1);
 		return 1;
 	}
-	//chprintf((BaseSequentialStream*)&SD3, "%d: %d, %f Hz %d\r\n",sequence_counter, max_norm_index, max_norm_index*15.625, chVTTimeElapsedSinceX(sequence_timer));
 	return 0;
 }
 

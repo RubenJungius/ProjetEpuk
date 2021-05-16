@@ -54,23 +54,41 @@ static THD_FUNCTION(measurements_thd, arg){
 #endif
 	chThdSleepMilliseconds(400);
 	while(1){
+		chprintf((BaseSequentialStream *)&SD3, "status measurement: %d", status);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
 		if(!status){
 			chMtxLock(mic_get_mutex());
 			chCondWait(mic_get_condition());
 			status = return_status();
 			chprintf((BaseSequentialStream*)&SD3, "Staus Measurement: %d", status);
+			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 			chMtxUnlock(mic_get_mutex());
 		}else{
+			chprintf((BaseSequentialStream *)&SD3, "ENTERINGMEASUREMENTSTUFF\r\n\n");
 			chMtxLock(&mutex);
 			measurements(2, &alpha);
 			chCondSignal(&dataProduced);
 			chMtxUnlock(&mutex);
+			chprintf((BaseSequentialStream *)&SD3, "POSTMUTEXMAGIC\r\n\n");
 
 			if(/*tmp*/!regulator_return_status()){
+				chprintf((BaseSequentialStream *)&SD3, "Reset\r\n\n");
 				right_motor_set_speed(0);
 				left_motor_set_speed(0);
-				chThdSleepSeconds(5);
+				chThdSleepSeconds(1);
+				alpha = 0;
+
+				status = 0;
 			}
+			/*if(regulator_return_count()>4){
+				//status = 0;
+				chprintf((BaseSequentialStream *)&SD3, "STATUS measurement: %d", status);
+				chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
+				chThdSleepMilliseconds(400); //so that values can be initalized and nothing wier dhappens
+				//chThdExit(0);
+			}*/
 		}
 		chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
 	}

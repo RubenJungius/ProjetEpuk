@@ -31,11 +31,12 @@
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
 #define OFFSET 		25 // mm, distance to the wall we want the robot to stabilize
 
-#define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION)
+#define KP 		(float)(MAX_ANGLE_ROT) / (float)(DIST_DETECTION-OFFSET)
 #define	KI		0  // useless in our case
 #define	KD		0  // useless in our case
 
 static int run_status;
+static int count;
 static mutex_t regulator_mutex;
 static condition_variable_t regulator_cond;
 
@@ -91,8 +92,9 @@ static THD_FUNCTION(regulation_thd, arg){
 	fixed_point quarter_circle = float_to_fixed(2*M_PI/4);
 	float pOld = - DIST_DETECTION + OFFSET;
 	float integral = 0;
-	int a = 0;
 	run_status = 1;
+	//count = 0;
+	count = 0;
 
 #ifdef AUDIO
 	int status = 0;
@@ -101,21 +103,25 @@ static THD_FUNCTION(regulation_thd, arg){
 #endif
 	chThdSleepMilliseconds(400);
 	while(1) {
+		chprintf((BaseSequentialStream *)&SD3, "status : %d",status);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		if(!status){
 			chMtxLock(mic_get_mutex());
 			chCondWait(mic_get_condition());
 			status = return_status();
 			chMtxUnlock(mic_get_mutex());
 		}else{
+			chprintf((BaseSequentialStream *)&SD3, "enteringregulatorstuff\r\n\n");
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
 			angleSum += regulation(&pOld, &integral);
 			chMtxUnlock(get_mutex());
-			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(quarter_circle - angleSum));
-			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+			chprintf((BaseSequentialStream *)&SD3, "postmutexthingy\r\n\n");
+			//chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(quarter_circle - angleSum));
+			//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 			if(angleSum >= quarter_circle) {
-				a += 1 & 1;
-				set_body_led(a);
+				count++;
+				set_body_led(count%2);
 				angleSum = 0;
 
 				//chMtxLock(regulator_get_mutex());
@@ -126,14 +132,27 @@ static THD_FUNCTION(regulation_thd, arg){
 
 				right_motor_set_speed(0);
 				left_motor_set_speed(0);
-				chThdSleepSeconds(5);
+				chThdSleepSeconds(1);
 
 				//chMtxLock(regulator_get_mutex());
 				//chCondWait(regulator_get_condition());
+				init_counter();//reset audio so that it can listen to new sequence
+				status = 0;
 				run_status = 1;
+				pOld = - DIST_DETECTION + OFFSET;
+				integral = 0;
+
+					//chThdSleepSeconds(3);
+					//angle_positioning(-M_PI/2);
+					//dist_positioning(50);
+					//chThdExit(1);
+
 				//chCondSignal(&regulator_cond);
 				//chMtxUnlock(regulator_get_mutex());
+				chprintf((BaseSequentialStream *)&SD3, "count : %d",count);
+				chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 			}
+
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
@@ -145,6 +164,9 @@ void regulation_start() {
 
 int regulator_return_status(void){
 	return run_status;
+}
+int regulator_return_count(void){
+	return count;
 }
 /****** PID *******/
 
@@ -160,13 +182,11 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		float dist1 = get_distance(get_prox(1)); // distance seen by the captor on the diagonal
 		uint8_t big_curve = 0;
 		if(dist1 < OFFSET) {
-			 big_curve = 1;
+			big_curve = 1;
 		}
 
-
-		chprintf((BaseSequentialStream *)&SD3, "dist1 : %f", dist1);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-
+		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f", dist1);
+		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		// Calculates beta, the objective angle
 		float beta = pid(*p_pOld, pNew, p_integral);
@@ -212,8 +232,8 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
 
-		chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+		//chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
+		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		return float_to_fixed(gama);
 	}
 	// game = 0 (the robots is far from the wall and goes straight forward)
