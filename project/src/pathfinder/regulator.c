@@ -27,11 +27,11 @@
 void dist_positioning(uint16_t frontDist) {
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	// move forward
-	if (get_distance(get_prox(0)) > frontDist) {
+	if (fixed_to_int32(get_distance(get_prox(0))) > frontDist) {
 		left_motor_set_speed(speed);
 		right_motor_set_speed(speed);
 		set_led(LED1, 1);
-		while (get_distance(get_prox(0)) >= frontDist) {}
+		while (fixed_to_int32(get_distance(get_prox(0))) >= frontDist) {}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		set_led(LED1, 0);
@@ -41,7 +41,7 @@ void dist_positioning(uint16_t frontDist) {
 		left_motor_set_speed(-speed);
 		right_motor_set_speed(-speed);
 		set_led(LED5, 1);
-		while (get_distance(get_prox(0)) <= frontDist) {}
+		while (fixed_to_int32(get_distance(get_prox(0))) <= frontDist) {}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		set_led(LED5, 0);
@@ -55,7 +55,7 @@ void angle_positioning(fixed_point angle) {
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	left_motor_set_speed(-speed);
 	right_motor_set_speed(speed);
-	chThdSleepMilliseconds(T * 1000);
+	chThdSleepMilliseconds(/*fixed_to_int32(T) */ 1000);
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
 }
@@ -128,12 +128,14 @@ fixed_point regulation(fixed_point* p_pOld, fixed_point* p_integral) {
 		fixed_point gama = (beta - alpha) /*- 0.1 * (correction)*/;
 
 		// Security to avoid a too big angle of rotation in one period
-		if(fixed_to_float(gama) > MAX_ANGLE_ROT && abs(correction) < 10) {
+		if(fixed_to_float(gama) > MAX_ANGLE_ROT) {
 			gama = float_to_fixed(MAX_ANGLE_ROT);
 		}
-		if(fixed_to_float(gama) < -MAX_ANGLE_ROT && abs(correction) < 10) {
+		if(fixed_to_float(gama) < -MAX_ANGLE_ROT) {
 			gama = float_to_fixed(-MAX_ANGLE_ROT);
 		}
+		chprintf((BaseSequentialStream *)&SD3, "gamma: %f", fixed_to_float(gama));
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		fixed_point ratio = float_to_fixed(speedWheelRatio(gama));
 

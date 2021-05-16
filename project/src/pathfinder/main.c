@@ -61,7 +61,7 @@ int main(void)
 
 	/* Return to the initial position */
 	dist_positioning(MEASUREMENT_NUMBER );
-	angle_positioning((float)M_PI / (float)2.25); // 80 deg attention magic number
+	angle_positioning(fix_div(float_to_fixed(M_PI), float_to_fixed(2.25))); // 80 deg attention magic number
 
 	//launch thread
 	measurements_start();
