@@ -24,7 +24,7 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.2 // sec
+#define PERIOD_REGULATOR	 0.1 // sec
 #define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
 #define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
@@ -88,7 +88,7 @@ static THD_FUNCTION(regulation_thd, arg){
 
 	// initial conditions
 	fixed_point angleSum = 0;
-	fixed_point full_circle = float_to_fixed(2*M_PI/8);
+	fixed_point quarter_circle = float_to_fixed(2*M_PI/4);
 	float pOld = - DIST_DETECTION + OFFSET;
 	float integral = 0;
 	int a = 0;
@@ -111,9 +111,9 @@ static THD_FUNCTION(regulation_thd, arg){
 			chCondWait(get_condition());
 			angleSum += regulation(&pOld, &integral);
 			chMtxUnlock(get_mutex());
-			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(full_circle - angleSum));
+			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(quarter_circle - angleSum));
 			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-			if(angleSum >= full_circle) {
+			if(angleSum >= quarter_circle) {
 				a += 1 & 1;
 				set_body_led(a);
 				angleSum = 0;
@@ -159,7 +159,7 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		// is there a big curve ?
 		float dist1 = get_distance(get_prox(1)); // distance seen by the captor on the diagonal
 		uint8_t big_curve = 0;
-		if(dist1 < 15) {
+		if(dist1 < OFFSET) {
 			 big_curve = 1;
 		}
 
@@ -182,22 +182,13 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 			gama = -MAX_ANGLE_ROT;
 		}
 
-
 		// Find the ratio between the speeds of the wheels
 		float ratio = speedWheelRatio(gama);
-
-		if(ratio > 1) {
-			set_led(LED7, 1);
-			set_led(LED3, 0);
-		}
-		if(ratio <= 1) {
-			set_led(LED7, 0);
-			set_led(LED3, 1);
-		}
 
 		// Give the commands to the motor
 		int16_t rightSpeed = MOTOR_SPEED_LIMIT_MARGIN;
 		int16_t leftSpeed = MOTOR_SPEED_LIMIT_MARGIN;
+
 		if(gama >= 0 && !big_curve) {
 			leftSpeed = ratio * rightSpeed;
 		}
@@ -205,22 +196,27 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		else if(gama < 0 && !big_curve) {
 			rightSpeed = leftSpeed / ratio;
 		}
-		// there is a big curve ! the robot need to rotate fast (rotation on itself) => R_ROT_ROB_MIN = 0
+
+		// there is a big curve ! the robot need to stop and rotate on its axis => R_ROT_ROB_MIN = 0
 		else {
-			leftSpeed = - MOTOR_SPEED_LIMIT_MARGIN;
-			gama = (float)(MAX_DIST_ONE_CYCLE) / (float)((DIAM_ROBOT/2));
+			// reduce a bit the speed during the maneuver
+			rightSpeed = MOTOR_SPEED_LIMIT_MARGIN / 2;
+			leftSpeed = - MOTOR_SPEED_LIMIT_MARGIN / 2;
+
+			gama = (float)((MOTOR_SPEED_LIMIT_MARGIN_RAD_S / 2) * RADIUS_WHEEL * PERIOD_REGULATOR) / (float)(DIAM_ROBOT / 2);
 		}
+
 		left_motor_set_speed(leftSpeed);
 		right_motor_set_speed(rightSpeed);
 
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
 
-
 		chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
 		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 		return float_to_fixed(gama);
 	}
+	// game = 0 (the robots is far from the wall and goes straight forward)
 	return 0;
 }
 
@@ -228,15 +224,9 @@ float pid(float pOld, float pNew, float* p_integral) {
 
 	// Calculates the derivative
 	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
-	/*
-	chprintf((BaseSequentialStream *)&SD3, "deriv : %f", deriv);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 
 	// Calculates the integral and save the value in a pointer for next iteration
 	*p_integral += pNew;
-	/*chprintf((BaseSequentialStream *)&SD3, "integral : %f", *p_integral);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
-
 
 	// Calculates beta, the objective angle
 	return ((KP * pNew) + (KI * (*p_integral)) + (KD * deriv));
@@ -255,9 +245,9 @@ float speedWheelRatio(float gama) {
 		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
 	}
 
-	// gama == 0
+	// gama == 0, ratio wL/wR = 1 (the robot goes straight forward)
 	else {
-		return 1; // ratio wL/wR = 1 (the robot goes straight forward)
+		return 1;
 	}
 
 	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR

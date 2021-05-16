@@ -12,8 +12,8 @@
 #define RADIUS_WHEEL 20.7 //mm
 
 
-//#define MAX_SPEED_MM_S 130 // [mm/s]
-#define MOTOR_SPEED_LIMIT_MARGIN 1000  // [step/s]
+
+#define MOTOR_SPEED_LIMIT_MARGIN 1000   // [step/s]
 #define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI  // [rad/s]
 #define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130  // [mm/s]
 
