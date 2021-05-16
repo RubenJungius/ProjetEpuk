@@ -18,31 +18,14 @@
 #include "main.h"
 #include <motors.h>
 #include "measurements.h"
-#include "regulator.h"
+//#include "regulator.h"
+#include "constants.h"
 #include "process_mic.h"
 
 #include "sensors/proximity.h"
 
-
-#define PERIOD_MEASUREMENTS 0.2 //sec
-#define PERIOD_MEASUREMENT 0.025 //sec
-#define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
-
-/*static void serial_start(void)
-{
-	static SerialConfig ser_cfg = {
-			115200,
-			0,
-			0,
-			0,
-	};
-
-	sdStart(&SD3, &ser_cfg); // UART3.
-}*/
-
-
-float pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
-float alpha = 0;
+static fixed_point pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
+static fixed_point alpha = 0;
 
 static mutex_t mutex;
 static condition_variable_t dataProduced;
@@ -53,10 +36,6 @@ static THD_FUNCTION(measurements_thd, arg){
 	(void) arg;
 	chRegSetThreadName(__FUNCTION__);
 
-	// initial conditions
-	//int16_t integral = 0;
-	//int16_t pOld = - DIST_DETECTION + OFFSET;
-	//uint8_t firstDetection = 1;
 
 	chMtxObjectInit(&mutex);
 	chCondObjectInit(&dataProduced);
@@ -88,36 +67,34 @@ void measurements_start(){
 	chThdCreateStatic(measurements_thd_wa, sizeof(measurements_thd_wa), NORMALPRIO+2, measurements_thd, NULL);
 }
 
-void measurements(uint8_t captorNumber, float* p_alpha) {
+void measurements(uint8_t captorNumber, fixed_point* p_alpha) {
 
 	left_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
 	right_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
 	for(int8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i >= 0 ; i--) {
 		pastMeasurements[i] = - get_distance(get_prox(captorNumber));
 		chThdSleepMilliseconds(PERIOD_MEASUREMENT * 1000);
-		/*chprintf((BaseSequentialStream *)&SD3, "pos %d : %f", i, pastMeasurements[i]);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 	}
 	find_alpha(p_alpha);
 }
 
-void find_alpha(float* p_alpha) {
-	float angle[RECORDED_MEASUREMENTS_NUMBER - 2];
-	float angleSum = 0;
+void find_alpha(fixed_point* p_alpha) {
+	fixed_point angle[RECORDED_MEASUREMENTS_NUMBER - 2];
+	fixed_point angleSum = 0;
 	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 1 ; i--) {
-		angle[i] = atan((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(2*MAX_DIST_ONE_CYCLE));
+		float a = fixed_to_float(pastMeasurements[i]);
+		float b = fixed_to_float(pastMeasurements[i-2]);
+		angle[i] = float_to_fixed(atan((a-b)/(float)(2*MAX_DIST_ONE_CYCLE_MEASUREMENT)));//calculation by float since tanget
 		angleSum += angle[i];
 	}
-	*p_alpha = angleSum / (float)2;
-	/*chprintf((BaseSequentialStream *)&SD3, "angle %f", *p_alpha);
-	chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
+	*p_alpha = fix_div(angleSum, int32_to_fixed(2));
 }
 
-float get_alpha() {
+fixed_point get_alpha() {
 	return alpha;
 }
 
-float* get_dist_data() {
+fixed_point* get_dist_data() {
 	return pastMeasurements;
 }
 

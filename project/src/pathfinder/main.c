@@ -16,6 +16,7 @@
 #include "regulator.h"
 #include "communications.h"
 #include "collision_detect.h"
+#include "constants.h"
 
 #include <audio/microphone.h>
 #include <process_mic.h>
