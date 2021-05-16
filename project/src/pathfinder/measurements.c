@@ -30,6 +30,7 @@
 //#define PERIOD_MEASUREMENTS 0.1 //sec
 #define PERIOD_MEASUREMENT 0.0125 //sec
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
+#define RADIUS_ROBOT 35 //mm
 
 float pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
 float alpha = 0;
@@ -57,7 +58,7 @@ void measurements(uint8_t captorNumber, float* p_alpha) {
 	left_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
 	right_motor_set_speed(MOTOR_SPEED_LIMIT_MARGIN);
 	for(int8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i >= 0 ; i--) {
-		pastMeasurements[i] = - get_distance(get_prox(captorNumber));
+		pastMeasurements[i] = - ((get_distance(get_prox(captorNumber)) - RADIUS_ROBOT) * cos(alpha) + RADIUS_ROBOT);
 		chThdSleepMilliseconds(PERIOD_MEASUREMENT * 1000);
 	}
 	find_alpha(p_alpha);

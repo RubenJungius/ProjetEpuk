@@ -114,26 +114,26 @@ float speedWheelRatio(float gama) {
 }
 
 /* It calculates the "objective angle" (beta) based on a Proportional term, an Integral term and a Derivative term. */
-float pid(float pOld, float pNew, float* p_integral) {
+float pid(float yOld, float y, float* p_integral) {
 
 	// Calculates the derivative
-	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
+	float deriv = (y - yOld)/(PERIOD_REGULATOR);
 
 	// Calculates the integral and save the value in a pointer for next iteration
-	*p_integral += pNew;
+	*p_integral += y;
 
 	// Calculates beta, the objective angle
-	return ((KP * pNew) + (KI * (*p_integral)) + (KD * deriv));
+	return ((KP * y) + (KI * (*p_integral)) + (KD * deriv));
 }
 
 /* It calculates the corrected angle (output) and adjust it with a wheel speed ratio algorithm. */
-fixed_point regulation(float* p_pOld, float* p_integral) {
+fixed_point regulation(float* p_yOld, float* p_integral) {
 
 	float alpha = get_alpha();
-	float pNew = (((float*)get_dist_data())[0] + OFFSET) * cos(alpha);
+	float y = (get_dist_data())[0] + OFFSET;
 
 	// wall approaching algorithm
-	if(pNew >= - DIST_DETECTION + OFFSET){
+	if(y >= - DIST_DETECTION + OFFSET){
 
 		// is there a big curve ?
 		float dist1 = get_distance(get_prox(1)); // distance seen by the captor on the diagonal
@@ -143,7 +143,7 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		}
 
 		// Calculates beta, the objective angle
-		float beta = pid(*p_pOld, pNew, p_integral);
+		float beta = pid(*p_yOld, y, p_integral);
 
 		// Calculates the angle we want the robot to rotate
 		float gama = (beta - alpha);
@@ -184,7 +184,7 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		right_motor_set_speed(rightSpeed);
 
 		// Save current position in a pointer for next iteration
-		*p_pOld = pNew;
+		*p_yOld = y;
 
 
 		return float_to_fixed(gama);
@@ -216,7 +216,7 @@ static THD_FUNCTION(regulation_thd, arg){
 	// initial conditions
 	fixed_point angleSum = 0;
 	fixed_point quarter_circle = float_to_fixed(2*M_PI/4);
-	float pOld = - DIST_DETECTION + OFFSET;
+	float yOld = - DIST_DETECTION + OFFSET;
 	float integral = 0;
 	run_status = 1;
 	count = 0;
@@ -236,7 +236,7 @@ static THD_FUNCTION(regulation_thd, arg){
 		}else{
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
-			angleSum += regulation(&pOld, &integral);
+			angleSum += regulation(&yOld, &integral);
 			chMtxUnlock(get_mutex());
 			if(angleSum >= quarter_circle) {
 				count++;
@@ -249,7 +249,7 @@ static THD_FUNCTION(regulation_thd, arg){
 				init_counter();//reset audio so that it can listen to new sequence
 				status = 0;
 				run_status = 1;
-				pOld = - DIST_DETECTION + OFFSET;
+				yOld = - DIST_DETECTION + OFFSET;
 				integral = 0;
 			}
 		}
