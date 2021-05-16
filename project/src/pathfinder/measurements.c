@@ -24,8 +24,26 @@
 
 #include "sensors/proximity.h"
 
-static fixed_point pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
-static fixed_point alpha = 0;
+
+#define PERIOD_MEASUREMENTS 0.05 //sec
+#define PERIOD_MEASUREMENT 0.005 //sec
+#define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_MEASUREMENT // mm
+
+/*static void serial_start(void)
+{
+	static SerialConfig ser_cfg = {
+			115200,
+			0,
+			0,
+			0,
+	};
+
+	sdStart(&SD3, &ser_cfg); // UART3.
+}*/
+
+
+float pastMeasurements[RECORDED_MEASUREMENTS_NUMBER];
+float alpha = 0;
 
 static mutex_t mutex;
 static condition_variable_t dataProduced;
@@ -84,8 +102,10 @@ void find_alpha(fixed_point* p_alpha) {
 	for(uint8_t i = RECORDED_MEASUREMENTS_NUMBER - 1 ; i > 1 ; i--) {
 		angle[i] = asin((pastMeasurements[i] - pastMeasurements[i - 2])/(float)(MAX_DIST_ONE_CYCLE));
 		angleSum += angle[i];
+		/*chprintf((BaseSequentialStream *)&SD3, "angle %d : %f", i, angle[i]);
+		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");*/
 	}
-	*p_alpha = fix_div(angleSum, int32_to_fixed(2));
+	*p_alpha = angleSum / (float)2;
 }
 
 fixed_point get_alpha() {
