@@ -13,9 +13,9 @@
 
 
 //#define MAX_SPEED_MM_S 130 // [mm/s]
-#define MOTOR_SPEED_LIMIT_MARGIN 1000 / 2 // [step/s]
-#define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI / 2 // [rad/s]
-#define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130 / 2 // [mm/s]
+#define MOTOR_SPEED_LIMIT_MARGIN 1000  // [step/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_RAD_S 2 * M_PI  // [rad/s]
+#define MOTOR_SPEED_LIMIT_MARGIN_MM_S 130  // [mm/s]
 
 
 /* Find the tab values against the raw value and return the proportional converted value from these 2 values in tenth of mm.
@@ -33,11 +33,14 @@ void regulation_start(void);
 
 //PID
 
+int regulator_return_status(void);
+
 fixed_point regulation(float* p_pOld, float* p_integral);
 
 float pid(float p_pOld, float pNew, float* p_integral);
 
 float speedWheelRatio(float gama);
 
-
+mutex_t* regulator_get_mutex(void);
+condition_variable_t* regulator_get_condition(void);
 #endif /* REGULATOR_H_ */

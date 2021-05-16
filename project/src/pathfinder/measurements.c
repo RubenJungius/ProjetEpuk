@@ -52,7 +52,7 @@ static THD_FUNCTION(measurements_thd, arg){
 #else
 	int status = 1;
 #endif
-
+	chThdSleepMilliseconds(400);
 	while(1){
 		if(!status){
 			chMtxLock(mic_get_mutex());
@@ -65,6 +65,12 @@ static THD_FUNCTION(measurements_thd, arg){
 			measurements(2, &alpha);
 			chCondSignal(&dataProduced);
 			chMtxUnlock(&mutex);
+
+			if(/*tmp*/!regulator_return_status()){
+				right_motor_set_speed(0);
+				left_motor_set_speed(0);
+				chThdSleepSeconds(5);
+			}
 		}
 		chThdSleepMilliseconds(PERIOD_MEASUREMENTS * 1000);
 	}

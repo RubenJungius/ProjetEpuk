@@ -35,7 +35,9 @@
 #define	KI		0  // useless in our case
 #define	KD		0  // useless in our case
 
-
+static int run_status;
+static mutex_t regulator_mutex;
+static condition_variable_t regulator_cond;
 
 void dist_positioning(uint16_t frontDist) {
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
@@ -71,7 +73,13 @@ void angle_positioning(float angle) {
 	right_motor_set_speed(0);
 }
 
+mutex_t* regulator_get_mutex() {
+	return &regulator_mutex;
+}
 
+condition_variable_t* regulator_get_condition() {
+	return &regulator_cond;
+}
 
 static THD_WORKING_AREA(regulation_thd_wa, 256);
 static THD_FUNCTION(regulation_thd, arg){
@@ -80,17 +88,18 @@ static THD_FUNCTION(regulation_thd, arg){
 
 	// initial conditions
 	fixed_point angleSum = 0;
-	fixed_point full_circle = float_to_fixed(2*M_PI);
+	fixed_point full_circle = float_to_fixed(2*M_PI/8);
 	float pOld = - DIST_DETECTION + OFFSET;
 	float integral = 0;
-
+	int a = 0;
+	run_status = 1;
 
 #ifdef AUDIO
 	int status = 0;
 #else
 	int status = 1;
 #endif
-
+	chThdSleepMilliseconds(400);
 	while(1) {
 		if(!status){
 			chMtxLock(mic_get_mutex());
@@ -101,12 +110,30 @@ static THD_FUNCTION(regulation_thd, arg){
 			chMtxLock(get_mutex());
 			chCondWait(get_condition());
 			angleSum += regulation(&pOld, &integral);
+			chMtxUnlock(get_mutex());
 			chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(full_circle - angleSum));
 			chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 			if(angleSum >= full_circle) {
-				set_body_led(1);
+				a += 1 & 1;
+				set_body_led(a);
+				angleSum = 0;
+
+				//chMtxLock(regulator_get_mutex());
+				//chCondWait(regulator_get_condition());
+				run_status = 0;
+				//chCondSignal(&regulator_cond);
+				//chMtxUnlock(regulator_get_mutex());
+
+				right_motor_set_speed(0);
+				left_motor_set_speed(0);
+				chThdSleepSeconds(5);
+
+				//chMtxLock(regulator_get_mutex());
+				//chCondWait(regulator_get_condition());
+				run_status = 1;
+				//chCondSignal(&regulator_cond);
+				//chMtxUnlock(regulator_get_mutex());
 			}
-			chMtxUnlock(get_mutex());
 		}
 		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
@@ -116,8 +143,10 @@ void regulation_start() {
 	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
 }
 
-
-/****** REGULATOR *******/
+int regulator_return_status(void){
+	return run_status;
+}
+/****** PID *******/
 
 fixed_point regulation(float* p_pOld, float* p_integral) {
 
