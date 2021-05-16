@@ -10,9 +10,11 @@
 #include <usbcfg.h>
 #include <main.h>
 #include <motors.h>
+#include "measurements.h"
 #include <chprintf.h>
 #include <leds.h>
 #include "calibration.h"
+#include "constants.h"
 #include "regulator.h"
 #include "communications.h"
 #include "collision_detect.h"
@@ -21,6 +23,8 @@
 #include <audio/microphone.h>
 #include <process_mic.h>
 #include "sensors/proximity.h"
+
+#define START_ANGLE	  M_PI/2.25 // Starts with an angle of 90° - 80° = 10° (Robot-Wall angle)
 
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
@@ -49,22 +53,27 @@ int main(void)
 #endif
 
 #ifdef AUDIO
-	//launchAudioThread
+	//launch Audio Thread
 	init_counter();
 	mic_start(&processAudioData);
 #endif
 
 
 #ifdef DRIVE
+
 	/* Calibration of the proximity captors */
 	calibration();
 
 	/* Return to the initial position */
-	dist_positioning(MEASUREMENT_NUMBER );
-	angle_positioning(M_PI/2.25); // 80 deg attention magic number
+	dist_positioning(MEASUREMENT_NUMBER + 2);
 
-	//launch thread
+	/* Rotates to the START_ANGLE */
+	angle_positioning(START_ANGLE);
+
+	//launch Measurements thread
 	measurements_start();
+
+	//launch Measurements thread
 	regulation_start();
 
 #endif
@@ -73,13 +82,12 @@ int main(void)
 	collision_detect_start();
 #endif
 
-	chThdSleepSeconds(2);
+	//chThdSleepSeconds(2);
 
-	/* Infinite loop. */
+	/* Infinite loop */
     while (1) {
         chThdSleepMilliseconds(1000);
     }
-
 }
 
 #define STACK_CHK_GUARD 0xe2dee396

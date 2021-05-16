@@ -12,10 +12,11 @@
 #include "ch.h"
 #include "floatmath.h"
 #include <chprintf.h>
-#include "main.h"
+
 
 #include "regulator.h"
 #include "calibration.h"
+#include "constants.h"
 #include <leds.h>
 #include <motors.h>
 #include "measurements.h"
@@ -24,10 +25,13 @@
 #include "sensors/proximity.h"
 
 
-#define PERIOD_REGULATOR	 0.1 // sec
-#define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2)
+				/***** DEFINE *****/
+
+//#define PERIOD_REGULATOR	 0.1 // sec
+#define SAFETY_DELAY 400 //msec
+#define R_ROT_ROB_MIN	 2 * (DIAM_ROBOT/2) // mm
 #define MAX_DIST_ONE_CYCLE  	MOTOR_SPEED_LIMIT_MARGIN_RAD_S * RADIUS_WHEEL * PERIOD_REGULATOR // mm
-#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2))
+#define MAX_ANGLE_ROT	 (float)(MAX_DIST_ONE_CYCLE) / (float)(R_ROT_ROB_MIN + (DIAM_ROBOT/2)) // rad
 #define DIST_DETECTION	   MEASUREMENT_NUMBER + 2 // mm
 #define OFFSET 		25 // mm, distance to the wall we want the robot to stabilize
 
@@ -35,12 +39,23 @@
 #define	KI		0  // useless in our case
 #define	KD		0  // useless in our case
 
+
+				/***** LOCAL VARIABLES *****/
+
 static int run_status;
 static int count;
 static mutex_t regulator_mutex;
 static condition_variable_t regulator_cond;
 
+
+
+				/***** LOCAL FUNCTIONS *****/
+
+
+/*** Positioning Functions ***/
+
 void dist_positioning(uint16_t frontDist) {
+
 	uint16_t speed = speed_conversion(MOTOR_SPEED_LIMIT_MARGIN_MM_S);
 	// move forward
 	if (get_distance(get_prox(0)) > frontDist) {
@@ -74,102 +89,44 @@ void angle_positioning(float angle) {
 	right_motor_set_speed(0);
 }
 
-mutex_t* regulator_get_mutex() {
-	return &regulator_mutex;
-}
 
-condition_variable_t* regulator_get_condition() {
-	return &regulator_cond;
-}
+/*** Regulator Functions ***/
 
-static THD_WORKING_AREA(regulation_thd_wa, 256);
-static THD_FUNCTION(regulation_thd, arg){
-	(void) arg;
-	chRegSetThreadName(__FUNCTION__);
+/* Output the ratio between the speed of the wheels that is needed in order to accomplish an angular rotation of gama in a PERIOD_REGULATOR. */
+float speedWheelRatio(float gama) {
 
-	// initial conditions
-	fixed_point angleSum = 0;
-	fixed_point quarter_circle = float_to_fixed(2*M_PI/4);
-	float pOld = - DIST_DETECTION + OFFSET;
-	float integral = 0;
-	run_status = 1;
-	//count = 0;
-	count = 0;
+	int16_t rRotRob = 0;
 
-#ifdef AUDIO
-	int status = 0;
-#else
-	int status = 1;
-#endif
-	chThdSleepMilliseconds(400);
-	while(1) {
-		chprintf((BaseSequentialStream *)&SD3, "status : %d",status);
-		chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-		if(!status){
-			chMtxLock(mic_get_mutex());
-			chCondWait(mic_get_condition());
-			status = return_status();
-			chMtxUnlock(mic_get_mutex());
-		}else{
-			chprintf((BaseSequentialStream *)&SD3, "enteringregulatorstuff\r\n\n");
-			chMtxLock(get_mutex());
-			chCondWait(get_condition());
-			angleSum += regulation(&pOld, &integral);
-			chMtxUnlock(get_mutex());
-			chprintf((BaseSequentialStream *)&SD3, "postmutexthingy\r\n\n");
-			//chprintf((BaseSequentialStream *)&SD3, "angleSum : %f",fixed_to_float(quarter_circle - angleSum));
-			//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-			if(angleSum >= quarter_circle) {
-				count++;
-				set_body_led(count%2);
-				angleSum = 0;
-
-				//chMtxLock(regulator_get_mutex());
-				//chCondWait(regulator_get_condition());
-				run_status = 0;
-				//chCondSignal(&regulator_cond);
-				//chMtxUnlock(regulator_get_mutex());
-
-				right_motor_set_speed(0);
-				left_motor_set_speed(0);
-				chThdSleepSeconds(1);
-
-				//chMtxLock(regulator_get_mutex());
-				//chCondWait(regulator_get_condition());
-				init_counter();//reset audio so that it can listen to new sequence
-				status = 0;
-				run_status = 1;
-				pOld = - DIST_DETECTION + OFFSET;
-				integral = 0;
-
-					//chThdSleepSeconds(3);
-					//angle_positioning(-M_PI/2);
-					//dist_positioning(50);
-					//chThdExit(1);
-
-				//chCondSignal(&regulator_cond);
-				//chMtxUnlock(regulator_get_mutex());
-				chprintf((BaseSequentialStream *)&SD3, "count : %d",count);
-				chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
-			}
-
-		}
-		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
+	if(gama > 0) {
+		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
 	}
+
+	else if(gama < 0) {
+		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
+	}
+
+	// gama == 0, ratio wL/wR = 1 (the robot goes straight forward)
+	else {
+		return 1;
+	}
+
+	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
 }
 
-void regulation_start() {
-	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
+/* It calculates the "objective angle" (beta) based on a Proportional term, an Integral term and a Derivative term. */
+float pid(float pOld, float pNew, float* p_integral) {
+
+	// Calculates the derivative
+	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
+
+	// Calculates the integral and save the value in a pointer for next iteration
+	*p_integral += pNew;
+
+	// Calculates beta, the objective angle
+	return ((KP * pNew) + (KI * (*p_integral)) + (KD * deriv));
 }
 
-int regulator_return_status(void){
-	return run_status;
-}
-int regulator_return_count(void){
-	return count;
-}
-/****** PID *******/
-
+/* It calculates the corrected angle (output) and adjust it with a wheel speed ratio algorithm. */
 fixed_point regulation(float* p_pOld, float* p_integral) {
 
 	float alpha = get_alpha();
@@ -184,9 +141,6 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		if(dist1 < OFFSET) {
 			big_curve = 1;
 		}
-
-		//chprintf((BaseSequentialStream *)&SD3, "dist1 : %f", dist1);
-		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
 
 		// Calculates beta, the objective angle
 		float beta = pid(*p_pOld, pNew, p_integral);
@@ -232,43 +186,89 @@ fixed_point regulation(float* p_pOld, float* p_integral) {
 		// Save current position in a pointer for next iteration
 		*p_pOld = pNew;
 
-		//chprintf((BaseSequentialStream *)&SD3, "gama: %f", gama);
-		//chprintf((BaseSequentialStream *)&SD3, "\r\n\n");
+
 		return float_to_fixed(gama);
 	}
 	// game = 0 (the robots is far from the wall and goes straight forward)
 	return 0;
 }
 
-float pid(float pOld, float pNew, float* p_integral) {
 
-	// Calculates the derivative
-	float deriv = (pNew - pOld)/(PERIOD_REGULATOR);
+			/***** MUTEX *****/
 
-	// Calculates the integral and save the value in a pointer for next iteration
-	*p_integral += pNew;
+mutex_t* regulator_get_mutex() {
+	return &regulator_mutex;
+}
 
-	// Calculates beta, the objective angle
-	return ((KP * pNew) + (KI * (*p_integral)) + (KD * deriv));
+condition_variable_t* regulator_get_condition() {
+	return &regulator_cond;
 }
 
 
-float speedWheelRatio(float gama) {
 
-	int16_t rRotRob = 0;
+			/***** THREAD OF THE REGULATOR *****/
 
-	if(gama > 0) {
-		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) - (DIAM_ROBOT/2);
+static THD_WORKING_AREA(regulation_thd_wa, 256);
+static THD_FUNCTION(regulation_thd, arg){
+	(void) arg;
+	chRegSetThreadName(__FUNCTION__);
+
+	// initial conditions
+	fixed_point angleSum = 0;
+	fixed_point quarter_circle = float_to_fixed(2*M_PI/4);
+	float pOld = - DIST_DETECTION + OFFSET;
+	float integral = 0;
+	run_status = 1;
+	count = 0;
+
+#ifdef AUDIO
+	int status = 0;
+#else
+	int status = 1;
+#endif
+	chThdSleepMilliseconds(SAFETY_DELAY);
+	while(1) {
+		if(!status){
+			chMtxLock(mic_get_mutex());
+			chCondWait(mic_get_condition());
+			status = return_status();
+			chMtxUnlock(mic_get_mutex());
+		}else{
+			chMtxLock(get_mutex());
+			chCondWait(get_condition());
+			angleSum += regulation(&pOld, &integral);
+			chMtxUnlock(get_mutex());
+			if(angleSum >= quarter_circle) {
+				count++;
+				set_body_led(count%2);
+				angleSum = 0;
+				run_status = 0;
+				right_motor_set_speed(0);
+				left_motor_set_speed(0);
+				chThdSleepSeconds(1);
+				init_counter();//reset audio so that it can listen to new sequence
+				status = 0;
+				run_status = 1;
+				pOld = - DIST_DETECTION + OFFSET;
+				integral = 0;
+			}
+		}
+		chThdSleepMilliseconds(PERIOD_REGULATOR * 1000);
 	}
+}
 
-	else if(gama < 0) {
-		rRotRob = ((float)(MAX_DIST_ONE_CYCLE) / gama) + (DIAM_ROBOT/2);
-	}
 
-	// gama == 0, ratio wL/wR = 1 (the robot goes straight forward)
-	else {
-		return 1;
-	}
+				/***** GLOBAL FUNCTIONS *****/
 
-	return (float)(rRotRob - (DIAM_ROBOT/2)) / (float)(rRotRob + (DIAM_ROBOT/2)); // wL/wR
+
+void regulation_start() {
+	chThdCreateStatic(regulation_thd_wa, sizeof(regulation_thd_wa), NORMALPRIO+1, regulation_thd, NULL);
+}
+
+int regulator_return_status(void){
+	return run_status;
+}
+
+int regulator_return_count(void){
+	return count;
 }
