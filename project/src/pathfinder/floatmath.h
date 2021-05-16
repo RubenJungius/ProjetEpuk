@@ -3,6 +3,7 @@
 
 #define SCALE 16
 
+//fixed point math functions
 typedef int32_t fixed_point;
 
 float fixed_to_float(fixed_point in);

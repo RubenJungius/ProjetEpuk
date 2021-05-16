@@ -17,8 +17,11 @@ typedef enum {
 	BACK_OUTPUT
 } BUFFER_NAME_t;
 
+//resets or initizalizes variables
 void init_counter(void);
+//function passed on to mic
 void processAudioData(int16_t *data, uint16_t num_samples);
+// mutex defintions
 mutex_t* mic_get_mutex(void);
 condition_variable_t* mic_get_condition(void);
 int return_status(void);
